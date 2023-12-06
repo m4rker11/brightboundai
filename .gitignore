@@ -1,0 +1,7 @@
+.env
+/build
+/cache
+/error_logs
+/output
+/data
+/profile
