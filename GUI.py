@@ -4,6 +4,7 @@ import json
 import os
 from enrichmentPipeline import enrichCSV, writeEmailForEntry
 import strings 
+import Persistent.leadService as Leads
 # Define the functions enrichRow and enrichCSV (already provided)
 
 # Streamlit UI
@@ -40,14 +41,7 @@ def enrich_csv_page():
             new_column_names = [st.text_input(f"Column {i+1}", column_names[i]) for i in range(len(column_names))]
             if st.button("Update Column Names or save to relevant foulder"):
                 data.columns = new_column_names
-                #create a new foulder for the data
-                if not os.path.exists(foulderName):
-                    if not os.path.exists("data"):
-                        os.mkdir("data")
-                    os.mkdir(foulderName)
-                # Save the changes to a new CSV file
-                modified_file_name = uploaded_file.name
-                data.to_csv(foulderName+"/"+modified_file_name, index=False)
+                Leads.addLeadsFromDataFrame(data)
                 st.success("Column names updated and changes saved!")
 
 
