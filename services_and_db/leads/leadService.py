@@ -1,6 +1,7 @@
 import csv
 import LeadMongo as Leads
 import pandas as pd
+import campaigns.campaignMongo as Campaigns
 def addLead(lead)->bool:
     """
     Adds a lead to the database

@@ -1,0 +1,63 @@
+from pymongo import MongoClient
+from bson import ObjectId
+from dotenv import load_dotenv
+import os
+# get connetion string from .env file
+load_dotenv()
+connection_string = os.getenv("MONGO_CONNECTION_STRING")
+# Connect to MongoDB
+client = MongoClient(connection_string)
+db = client['brightbound']
+collection = db['clients']
+
+client_schema = {
+    "name": str,
+    "email": str,
+    "company_name": str,
+    "company_website": str,
+    "company_industry": str,
+    "company_summary": dict,
+    "company_emails": list,
+}
+
+def get_client_by_email(email):
+    """
+    Gets a client by email
+    """
+    client = collection.find_one({"email": email})
+    return client
+
+def get_client_by_id(id):
+    """
+    Gets a client by id
+    """
+    client = collection.find_one({"_id": ObjectId(id)})
+    return client
+
+def create_client(client):
+    """
+    Creates a client
+    """
+    result = collection.insert_one(client)
+    return result.acknowledged
+
+def update_client(id, client):
+    """
+    Updates a client
+    """
+    result = collection.update_one({"_id": ObjectId(id)}, {"$set": client})
+    return result.acknowledged
+
+def add_email_to_client(id, email):
+    """
+    Adds an email to a client
+    """
+    result = collection.update_one({"_id": ObjectId(id)}, {"$push": {"company_emails": email}})
+    return result.acknowledged
+
+def remove_email_from_client(id, email):
+    """
+    Removes an email from a client
+    """
+    result = collection.update_one({"_id": ObjectId(id)}, {"$pull": {"company_emails": email}})
+    return result.acknowledged

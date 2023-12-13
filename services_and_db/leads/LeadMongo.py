@@ -32,18 +32,12 @@ lead_schema = {
     'created': str,
     'last_updated': str,
     'contacted': str,
+    'campaign_context':dict,
     'campaign_id': ObjectId,
     'ignore': bool,
+    'client_id': ObjectId,
 }
 
-email_format_schema = {
-    "email_format": str,
-    "personalization": str,
-    "icp": str,
-    "offer": str,
-    "body": str,
-    "call_to_action": str
-}
 def validate_lead(lead):
     if not isinstance(lead, dict):
         raise ValueError("Lead must be a dictionary")

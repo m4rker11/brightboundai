@@ -2,15 +2,15 @@ import dotenv
 import os
 import json
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.output_parser import StrOutputParser
 from langchain.output_parsers.json import SimpleJsonOutputParser
 dotenv.load_dotenv()
 llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
 
-def writeEmail(name, company, linkedin_summary, website_content, product_context, outputFormat):
+def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_context, outputFormat):
     
-    emailBaseFormat = """
+    emailBaseFormat = base_format if base_format != None and base_format != "" else """
     Hi \{ firstName \},
 
     \{ BODY \}
@@ -30,20 +30,13 @@ def writeEmail(name, company, linkedin_summary, website_content, product_context
 
     Send to: {name} from {company} whose background is {linkedin_summary}
 
-    Value prop: {website_content}
-
     ----
 
-    You are the sales rep from BrightBoundAI, 
-    an AI personalization focused lead generation company that specializes 
-    at targeted and performance priced cold outreach. 
-    BrightBoundAI uses AI personalization to create and manage 
-    successful cold email campaigns on behalf of our clients. 
-    We find them prospective customers, enrich their information, then use AI to create custom 
-    email campaigns for each prospect, and then deliver them on client's behalf, scheduling an 
-    introductory call with the qualified prospect directly in the client's calendar. 
-    Our offer is performance based, only pay for qualified prospects that show up to the call. 
-    We also offer 100% money back 30 day satisfaction guarantee.
+    Here is the context about the product you are trying to sell:
+
+    {product_context}
+
+    ----
 
     I need to write an email that will follow the following format:
 
@@ -73,7 +66,6 @@ def writeEmail(name, company, linkedin_summary, website_content, product_context
 
     chain = prompt | model | output_parser
     return chain.invoke({  
-        "website_content": website_content,
         "product_context": product_context,
         "company": company,
         "name": name,
@@ -81,6 +73,57 @@ def writeEmail(name, company, linkedin_summary, website_content, product_context
         "emailBaseFormat": emailBaseFormat,
         "output_format": outputFormat
     })
+
+def generateEmailFormat(product_context, target, past_attempts=[], past_performance=[]):
+    injection = ""
+    if len(past_attempts) != len(past_performance):
+        raise ValueError("past_attempts and past_performance must be the same length")
+    elif len(past_attempts) != 0:
+        #join the past attempts and performance into a list that looks like this: [{attempt: "attempt", performance: "performance"}, ...}]
+        past_emails_and_performance = [{'attempt': past_attempts[i], 'performance': past_performance[i]} for i in range(len(past_attempts))]
+        past_emails_and_performance = json.dumps(past_emails_and_performance)
+        injection = " These are some of the past attempts to get in touch with the ICP and their performance: " + past_emails_and_performance
+    json_format = """
+    {{
+    "campaign": text, //this is what the email will look like aka "Dear {{ firstName }}, {{ body }}, {{ callToAction }}, {{ signoff }}"
+    "variables": dict, //this is the dictionary of variables that will be used to fill in the campaign, aka {{"firstName": "John", "body": "I wanted to reach out because we connect [specific description of their business mentioning their niche, subsegment, and location ~ 7 words] like yours with [their ICP ~15 words] and [ICPs goals, can be found in the offer].", "callToAction": "I would love to chat with you about how we can help you achieve your goals.  Are you available for a quick call this week?"}}
+    }}
+    """
+    
+    prompt_template = """ 
+    You are crafting an email template that is sure to appeal to the following ICP: 
+    ---
+    {target}
+    
+    Every field in the ICP above is known for each client who fits this ICP.
+    ---
+    
+    You want to sell them the following product:
+    ---
+    {product_context}
+    ---
+    In order to do that you want to create a campaign template
+    that can be used by other to create an appealing and personalized email.
+    This template will be fed to an LLM along with information about a specific client to turn this template into a personalized email.
+    ---
+    {injection}
+    ---
+    The template should follow the following json format:
+    ---
+    {json_format}
+
+    When this template will be used for personalized email, personalization will occur to what is within the square brackets[]. 
+    What is not surrounded by square brackets will end up in the email as is.    
+    """.format(injection=injection, json_format=json_format, target=target, product_context=product_context)    
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ('system', "You are a professional Sales Development Representative (SDR) at BrightBoundAI."),
+            ('user', prompt_template)
+        ]
+    )
+    chain = prompt | llm | SimpleJsonOutputParser()
+    return chain.invoke({"input": prompt_template})
+
     
 
 def generateSummaryOutput(profile_summary, website_summary):
@@ -103,6 +146,8 @@ def generateSummaryOutput(profile_summary, website_summary):
     9. Role: What is their role at the company (3-6 words)
     10. Location: Where they are based in (3-6 words)
 
+    Your response must be a valid JSON object
+
     RESPONSE:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI()
@@ -110,5 +155,7 @@ def generateSummaryOutput(profile_summary, website_summary):
 
     chain = prompt | model | output_parser
 
-    return chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
+    result = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
+    return json.loads(result)
 
+print(generateEmailFormat("This is a functionality test, imagine that your product is the google search engine", "This is a functionality test, imagine that your ICP are people who need to find something online"))
