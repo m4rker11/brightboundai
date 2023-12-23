@@ -3,12 +3,15 @@ import AI.emailWriter as emailWriter
 import scraper.scraper as scraper
 import linkedin.getLinkedInInfo as linkedin
 import csv
-import Persistent.leadService as Leads
+import services_and_db.leads.leadService as Leads
+import services_and_db.clients.clientMongo as Clients
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def batchEnrichList(rows, context, progress_bar, status_text, batch_size=10):
+def batchEnrichList(rows, progress_bar, status_text, batch_size=10):
     total_rows = len(rows)
     # Process rows in batches
+    clients = Clients.get_all_clients()
+    context = {client['_id']: client['company_summary'] for client in clients}
     for start_index in range(0, total_rows, batch_size):
         end_index = min(start_index + batch_size, total_rows)
         batch = rows[start_index:end_index]
@@ -28,9 +31,9 @@ def singleBatchEnrichmentRun(batch, executor, context):
         if enriched_row is not None:
             Leads.updateLead(enriched_row)
 
-def enrichMongoDB(product_context, progress_bar, status_text):
+def enrichMongoDB(progress_bar, status_text):
     unenriched_leads = Leads.get_unenriched_leads()
-    batchEnrichList(unenriched_leads, product_context, progress_bar, status_text)
+    batchEnrichList(unenriched_leads, progress_bar, status_text)
 
 
 def enrichRow(row, context):
@@ -44,7 +47,7 @@ def enrichRow(row, context):
     # part 3: summarize the linkedin profile
     linkedin_summary = summarizer.summarizeProfileData(linkedin_profile)
     # part 4: summarize the website content
-    website_summary = summarizer.summarizeWebsiteContent(website_content, context)
+    website_summary = summarizer.summarizeWebsiteContent(website_content, context[row['client_id']])
     # part 5: return the new row
     row['linkedin_summary'] = linkedin_summary['text']
     row['website_summary'] = website_summary['summary']

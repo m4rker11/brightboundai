@@ -1,7 +1,5 @@
 import csv
-import LeadMongo as Leads
-import pandas as pd
-import campaigns.campaignMongo as Campaigns
+import services_and_db.leads.LeadMongo as Leads
 def addLead(lead)->bool:
     """
     Adds a lead to the database
@@ -39,3 +37,6 @@ def addLeadsFromDataFrame(df)->bool:
 
 def updateLead(lead)->bool:
     return Leads.update_lead(lead['_id'], lead)
+
+def get_unenriched_leads():
+    return Leads.get_unenriched_leads()

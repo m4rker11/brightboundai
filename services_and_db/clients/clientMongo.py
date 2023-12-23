@@ -20,11 +20,11 @@ client_schema = {
     "company_emails": list,
 }
 
-def get_client_by_email(email):
+def get_client_by_name(name):
     """
-    Gets a client by email
+    Gets a client by name
     """
-    client = collection.find_one({"email": email})
+    client = collection.find_one({"name": name})
     return client
 
 def get_client_by_id(id):
@@ -61,3 +61,10 @@ def remove_email_from_client(id, email):
     """
     result = collection.update_one({"_id": ObjectId(id)}, {"$pull": {"company_emails": email}})
     return result.acknowledged
+
+def get_all_clients():
+    """
+    Gets all clients
+    """
+    clients = collection.find()
+    return clients

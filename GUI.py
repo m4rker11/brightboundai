@@ -2,24 +2,50 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-from enrichmentPipeline import enrichCSV, writeEmailForEntry
-import strings 
-import Persistent.leadService as Leads
+import enrichmentPipeline as ep
+import services_and_db.clients.clientMongo as Clients
+import services_and_db.leads.leadService as Leads
 # Define the functions enrichRow and enrichCSV (already provided)
 
 # Streamlit UI
 def main():
-
+    """ page choices: 
+        add leads to mongo
+            upload csv
+            confirm column names
+            add leads to mongo
+        enrich leads by query
+            enrich all unenriched leads
+            enrich by client id
+            enrich by campaign id
+        generate emails
+            generate template
+                generate follow up template
+            edit template
+            enrich with email template by campaign id and client id
+        
+        client setup
+            add client
+                assets
+                context
+                offer
+                guarantee
+                guidelines
+            create campaign
+            add leads to campaign
+            add email template
+            edit client context
+    """
     # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Enrich CSV", "Generate Emails"])
+    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails"])
 
-    if page == "Enrich CSV":
+    if page == "Leads":
         enrich_csv_page()
     elif page == "Generate Emails": 
         email_generation_page()
 
-def enrich_csv_page():
-    st.title("CSV Enrichment Tool")   
+def leads_page():
+    st.title("Lead Management Tool")   
         
     # Layout
     col1, col2 = st.columns([1, 1])
@@ -27,50 +53,41 @@ def enrich_csv_page():
     with col1:
         uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
         if uploaded_file is not None:
-            foulderName = "data/" + uploaded_file.name.split('.')[0]
-            data = pd.read_csv(uploaded_file)
-            st.write("First 5 entries of the uploaded file:")
-            st.dataframe(data.head())
-        
-
-    # Column name modification in the middle column
-    with col2:
-        if uploaded_file is not None:
             column_names = data.columns.tolist()
             st.write("Modify column names if necessary:")
             new_column_names = [st.text_input(f"Column {i+1}", column_names[i]) for i in range(len(column_names))]
             if st.button("Update Column Names or save to relevant foulder"):
                 data.columns = new_column_names
-                Leads.addLeadsFromDataFrame(data)
                 st.success("Column names updated and changes saved!")
+        
 
-
-    context = st.text_input("Enter context about your company:", strings.brightboundContext)
-    # Start enrichment process
-    if st.button("Start Enrichment") and context is not None:
+    # Column name modification in the middle column
+    with col2:
         if uploaded_file is not None:
-            
-            print(context + "test2")
-            if context == "":
-                context = "brightbound stuff"
-            # Setup for progress bar and status text
-            progress_bar = st.progress(0)
+            data = pd.read_csv(uploaded_file)
+            st.write("First 5 entries of the uploaded file:")
+            st.dataframe(data.head())
+            clients = Clients.get_all_clients()
+            client_names = [client['name'] for client in clients]
+            client_name = st.selectbox("Select Client", client_names)
+            if st.button("Add Leads to Client"):
+                # add client_id to each row
+                client_id = Clients.get_client_by_name(client_name)['_id']
+                data = data.assign(client_id=client_id)
+                # add leads to mongo    
+                Leads.addLeadsFromDataFrame(data)
+                st.success("Leads added to client!")
+    # the rest should be one column not two
+    #            enrich all unenriched leads
+    # client_context_dictionary should be {client_id: context, client_id: context}
+    if st.button("Enrich ALL Leads"):
+        progress_bar = st.progress(0)
             status_text = st.empty()
+
             status_text.text("Initializing enrichment process...")
-
-            # File processing setup
-            destination = "enriched_data.csv"
-
-            # Call the enrichment function
-            enrichCSV(uploaded_file.name, context, destination, progress_bar, status_text)
-
-            # Update status text after completion
+            ep.enrichMongoDB(progress_bar, status_text)
             status_text.text("Enrichment Completed!")
-
-            # Display the enriched data
-            enriched_data = pd.read_csv(destination)
-            st.write("Enriched File:")
-            st.dataframe(enriched_data.head())
+            # Setup for progress bar and status text
     else:
         # Inform the user to provide the context
         st.warning("Please enter the context for summarization to start enrichment.")

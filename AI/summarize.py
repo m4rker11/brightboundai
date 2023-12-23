@@ -49,11 +49,11 @@ def summarizeWebsiteContent(content, context):
     
         Based on the information above provide me the following:
     
-        1. Give me a 100-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. The summary you give me must be highly relevant to my product and service. Focus on the potential challenges and opportunities this company might face, where my product and service could potentially provide significant value.
+        1. Give me a 150-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. Focus on the potential challenges and opportunities this company might face, where my product and service could potentially provide significant value.
     
-        2. Give me a 10 word summary of the ideal customer profile that you infer from the website content, only talk about the website content in this section, not my product.
+        2. Give me a 10 word summary of the ideal customer profile that you infer from the website content.
     
-        3. Give me a 20 word summary of their offer to their ICP and the services they provide them, only talk about the website content in this section, not my product.
+        3. Give me a 20 word summary of their offer to their ICP and the services they provide them.
     
         CONTEXT ABOUT MY PRODUCT:
     
