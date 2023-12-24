@@ -4,18 +4,21 @@ from botasaurus import *
          reuse_driver=True)
 def scrape_website_task(driver: AntiDetectDriver, url):
     url = validate_url(url)
-    # Navigate to the Omkar Cloud website
-    driver.get(url)
-    
-    # Retrieve the heading element's text
-    whole = driver.text("html")
-    # Save the data as a JSON file in output/scrape_heading_task.json
-    return {
-        url: whole
-    }
+    exists = driver.exists(url)
+    if exists:
+        whole = driver.get_element_text("html")
+        print(whole)
+        return {
+            url: whole
+        }
+    else:
+        return None
+
 
 def validate_url(url):
     if url.startswith("http://") or url.startswith("https://"):
         return url
     else:
         return "http://" + url
+
+print(scrape_website_task("http://accuratetaxsolutions.com/"))

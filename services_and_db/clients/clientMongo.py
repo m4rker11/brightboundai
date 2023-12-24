@@ -18,13 +18,15 @@ client_schema = {
     "company_industry": str,
     "company_summary": dict,
     "company_emails": list,
+    "company_fees": str,
+    
 }
 
 def get_client_by_name(name):
     """
-    Gets a client by name
+    Gets a client by company name
     """
-    client = collection.find_one({"name": name})
+    client = collection.find_one({"company_name": name})
     return client
 
 def get_client_by_id(id):

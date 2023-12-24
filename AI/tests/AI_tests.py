@@ -40,7 +40,6 @@ class TestSummarize(unittest.TestCase):
 
     def test_writeEmail(self):
         result = ew.writeEmail(self.name, self.company, self.linkedin_summary, self.website_content, self.product_context, self.outputFormat)
-        print(result)
         # Check if the result is a dictionary
         self.assertIsInstance(result, dict)
         

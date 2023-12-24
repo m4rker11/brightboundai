@@ -37,60 +37,98 @@ def main():
             edit client context
     """
     # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails"])
+    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management"])
 
     if page == "Leads":
-        enrich_csv_page()
+        leads_page()
     elif page == "Generate Emails": 
         email_generation_page()
+    elif page == "Client Management":
+        client_management_page()
 
 def leads_page():
     st.title("Lead Management Tool")   
-        
-    # Layout
-    col1, col2 = st.columns([1, 1])
-    # Upload CSV in the left column
-    with col1:
-        uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
-        if uploaded_file is not None:
-            column_names = data.columns.tolist()
-            st.write("Modify column names if necessary:")
-            new_column_names = [st.text_input(f"Column {i+1}", column_names[i]) for i in range(len(column_names))]
-            if st.button("Update Column Names or save to relevant foulder"):
-                data.columns = new_column_names
-                st.success("Column names updated and changes saved!")
-        
+    uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
 
-    # Column name modification in the middle column
-    with col2:
-        if uploaded_file is not None:
+    if uploaded_file is not None:
+        if 'data' not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
+            # Load data and reset column names if a new file is uploaded
             data = pd.read_csv(uploaded_file)
-            st.write("First 5 entries of the uploaded file:")
+            st.session_state.data = data
+            st.session_state.uploaded_file_name = uploaded_file.name
+
+        st.write("Preview of uploaded file:")
+        st.dataframe(st.session_state.data.head())
+
+        # Column Renaming
+        column_names = st.session_state.data.columns.tolist()
+        st.write("Mandatory column names: full_name, name, company, website_url, linkedIn_url, email")
+        st.write("Modify column names if necessary:")
+        new_column_names = [st.text_input(f"Column {i+1}", column_names[i]) for i in range(len(column_names))]
+
+        if st.button("Update or Confirm Column Names"):
+            column_map = {column_names[i]: new_column_names[i] for i in range(len(column_names))}
+            st.session_state.data.rename(columns=column_map, inplace=True)
+            st.success(st.session_state.data.columns.tolist())  # Updated Column Names
+            st.success("Column names updated or confirmed!")
+
+        clients = Clients.get_all_clients()
+        client_names = [client['company_name'] for client in clients]
+        if len(client_names) == 0:
+            st.warning("Please add clients before adding leads.")
+        st.write("Select a client to add leads to:")
+        client_name = st.selectbox("Select Client", client_names)
+        if st.button("Add Leads to Client"):
+            # add client_id to each row
+            client = Clients.get_client_by_name(client_name)
+            client_id = client['_id']
+            st.session_state.data = st.session_state.data.assign(client_id=client_id)
+            st.dataframe(st.session_state.data.head()) #HERE THE COLUMN NAMES ARE BACK TO WHAT THEY WERE
+            # add leads to mongo    
+            data = st.session_state.data
             st.dataframe(data.head())
-            clients = Clients.get_all_clients()
-            client_names = [client['name'] for client in clients]
-            client_name = st.selectbox("Select Client", client_names)
-            if st.button("Add Leads to Client"):
-                # add client_id to each row
-                client_id = Clients.get_client_by_name(client_name)['_id']
-                data = data.assign(client_id=client_id)
-                # add leads to mongo    
-                Leads.addLeadsFromDataFrame(data)
-                st.success("Leads added to client!")
-    # the rest should be one column not two
-    #            enrich all unenriched leads
-    # client_context_dictionary should be {client_id: context, client_id: context}
+            Leads.addLeadsFromDataFrame(data)
+            st.success("Leads added to client!")
     if st.button("Enrich ALL Leads"):
         progress_bar = st.progress(0)
-            status_text = st.empty()
+        status_text = st.empty()
 
-            status_text.text("Initializing enrichment process...")
-            ep.enrichMongoDB(progress_bar, status_text)
-            status_text.text("Enrichment Completed!")
-            # Setup for progress bar and status text
-    else:
-        # Inform the user to provide the context
-        st.warning("Please enter the context for summarization to start enrichment.")
+        status_text.text("Initializing enrichment process...")
+        ep.enrichMongoDB(progress_bar, status_text)
+        status_text.text("Enrichment Completed!")
+
+def client_management_page():
+    st.title("Client Management Tool")
+      
+    company_emails = []
+    name = st.text_input("Client Name")
+    email = st.text_input("Client Email")
+    company_name = st.text_input("Company Name")
+    company_website = st.text_input("Company Website")
+    company_industry = st.text_input("Company Industry")
+    company_summary = st.text_input("Company Summary")
+    fees = st.text_input("Company Fees")
+    company_emails_text = st.text_input("Comma separated Company Emails")
+    if company_emails_text != "":
+        company_emails = company_emails_text.split(',')
+        company_emails = [email.strip() for email in company_emails]
+    if st.button("Add Client"):
+        client = {
+            "name": name,
+            "email": email,
+            "company_name": company_name,
+            "company_website": company_website,
+            "company_industry": company_industry,
+            "company_summary": company_summary,
+            "company_emails": company_emails,
+            "company_fees": fees
+        }
+        Clients.create_client(client)
+        st.success("Client added!")
+    client_list = Clients.get_all_clients()
+    client_names = [client['name'] for client in client_list]
+    st.selectbox("Select Client", client_names)
+    
 
 
 def email_generation_page():

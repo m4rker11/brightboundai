@@ -55,7 +55,6 @@ def process_linkedin_profile(linkedin_profile):
             for experience in linkedin_profile['data']['experiences'][:3] if len(linkedin_profile['data']['experiences']) > 0
         ]
     except:
-        print("ERRRRRRRRRRRRRRRROOOOOOOOOOOOOOORRRRRRRR: " + str(linkedin_profile))
         return linkedin_profile
     # Returning the 'about' information and formatted experiences
     return {

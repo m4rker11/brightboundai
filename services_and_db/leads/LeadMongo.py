@@ -49,12 +49,12 @@ def validate_lead(lead):
     # Check for field types and required fields
     for key, expected_type in lead_schema.items():
         if key in lead and not isinstance(lead[key], expected_type) and lead[key] is not None:
-            raise TypeError("Lead field {} must be of type {}".format(key, expected_type))
+            lead.pop(key)
 
     required_fields = ['email', 'website_url', 'linkedIn_url', 'name']
     for field in required_fields:
         if field not in lead or lead[field] is None:
-            raise ValueError("Lead field {} cannot be None".format(field))
+            return False
 
     return True  # If all checks pass, the lead is valid
 

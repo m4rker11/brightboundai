@@ -65,7 +65,7 @@ def summarizeWebsiteContent(content, context):
     
         RESPONSE:"""
         prompt1 = ChatPromptTemplate.from_template(prompt_template1)
-        model = ChatOpenAI()
+        model = ChatOpenAI(model="gpt-3.5-turbo-1106")
         output_parser = SimpleJsonOutputParser()
     
         chain = prompt1 | model | output_parser

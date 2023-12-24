@@ -7,8 +7,10 @@ def addLead(lead)->bool:
     if Leads.validate_lead(lead):
         db_lead = Leads.get_lead_by_email(lead['email'])
         if db_lead!= None:
+            print("Updating lead")
             return Leads.update_lead(db_lead['_id'], lead)
         else:
+            print("Adding lead")
             return Leads.add_lead(lead)
     else:
         return False
@@ -31,8 +33,9 @@ def addLeadsFromDataFrame(df)->bool:
     """
     for index, row in df.iterrows():
         lead = row.to_dict()
+        print(lead)
         if not addLead(lead):
-            return False
+            pass ### TODO: handle this
     return True
 
 def updateLead(lead)->bool:

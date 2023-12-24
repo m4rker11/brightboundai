@@ -157,5 +157,3 @@ def generateSummaryOutput(profile_summary, website_summary):
 
     result = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
     return json.loads(result)
-
-print(generateEmailFormat("This is a functionality test, imagine that your product is the google search engine", "This is a functionality test, imagine that your ICP are people who need to find something online"))
