@@ -74,15 +74,8 @@ def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_co
         "output_format": outputFormat
     })
 
-def generateEmailFormat(product_context, target, past_attempts=[], past_performance=[]):
-    injection = ""
-    if len(past_attempts) != len(past_performance):
-        raise ValueError("past_attempts and past_performance must be the same length")
-    elif len(past_attempts) != 0:
-        #join the past attempts and performance into a list that looks like this: [{attempt: "attempt", performance: "performance"}, ...}]
-        past_emails_and_performance = [{'attempt': past_attempts[i], 'performance': past_performance[i]} for i in range(len(past_attempts))]
-        past_emails_and_performance = json.dumps(past_emails_and_performance)
-        injection = " These are some of the past attempts to get in touch with the ICP and their performance: " + past_emails_and_performance
+def generateEmailFormat(product_context, target, email_objective):
+    
     json_format = """
     {{
     "campaign": text, //this is what the email will look like aka "Dear {{ firstName }}, {{ body }}, {{ callToAction }}, {{ signoff }}"
@@ -114,7 +107,7 @@ def generateEmailFormat(product_context, target, past_attempts=[], past_performa
 
     When this template will be used for personalized email, personalization will occur to what is within the square brackets[]. 
     What is not surrounded by square brackets will end up in the email as is.    
-    """.format(injection=injection, json_format=json_format, target=target, product_context=product_context)    
+    """.format(injection=email_objective, json_format=json_format, target=target, product_context=product_context)    
     prompt = ChatPromptTemplate.from_messages(
         [
             ('system', "You are a professional Sales Development Representative (SDR) at BrightBoundAI."),

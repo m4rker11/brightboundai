@@ -19,6 +19,7 @@ client_schema = {
     "company_summary": dict,
     "company_emails": list,
     "company_fees": str,
+    "icp": str,
     
 }
 

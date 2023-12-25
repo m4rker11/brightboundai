@@ -5,6 +5,8 @@ import os
 import enrichmentPipeline as ep
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
+import services_and_db.campaigns.campaignMongo as Campaigns
+from AI.emailWriter import generateEmailFormat
 # Define the functions enrichRow and enrichCSV (already provided)
 
 # Streamlit UI
@@ -37,7 +39,7 @@ def main():
             edit client context
     """
     # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management"])
+    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management"])
 
     if page == "Leads":
         leads_page()
@@ -45,6 +47,8 @@ def main():
         email_generation_page()
     elif page == "Client Management":
         client_management_page()
+    elif page == "Campaign Management":
+        campaign_page()
 
 def leads_page():
     st.title("Lead Management Tool")   
@@ -128,7 +132,84 @@ def client_management_page():
     client_list = Clients.get_all_clients()
     client_names = [client['name'] for client in client_list]
     st.selectbox("Select Client", client_names)
+
+def campaign_page():
+    st.title("Campaign Management Tool")
+    # Get all clients
+    clients = Clients.get_all_clients()
+    client_names = [client['company_name'] for client in clients]
+    chosen_client_name = st.selectbox("Select Client", client_names)
     
+    # Get selected client
+    client = Clients.get_client_by_name(chosen_client_name)
+    st.session_state.client = client
+
+    # Get campaigns for client
+    campaigns = Campaigns.get_campaigns_by_client_id(client['_id'])
+    campaign_names = [campaign['name'] for campaign in campaigns]
+    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names)
+
+    # Add Campaign Button
+    if st.button("Add Campaign"):
+        st.session_state['add_campaign_clicked'] = True
+
+    # Create New Campaign Section
+    if st.session_state.get('add_campaign_clicked', False):
+        new_campaign_name = st.text_input("Enter Campaign CodeName: ")
+        if st.button("Create new campaign"):
+            new_campaign_client = client['_id']
+            Campaigns.create_campaign(new_campaign_name, new_campaign_client)
+            chosen_campaign_name = new_campaign_name
+            st.success("Campaign added!")
+            st.session_state['add_campaign_clicked'] = False  # Reset the state
+
+    # Confirm Selection Button
+    if st.button("Confirm Selections"):
+        campaign = Campaigns.get_campaign_by_name(chosen_campaign_name)
+        st.session_state['campaign'] = campaign
+
+    try: 
+        if st.session_state['campaign'] is not None:
+        # EMAIL TEMPLATE CRAFTING
+            email_count = st.number_input("How many emails should be in the campaign?", min_value=1, max_value=10, value=5, key="email_count")
+
+            # Adjust the size of session_state.emails if the number of emails changes
+            if 'emails' not in st.session_state or len(st.session_state.emails) != email_count:
+                st.session_state.emails = [{'use_AI': False, 'email_objective': ''} for _ in range(email_count)]
+
+            # Create inputs for each email
+            for i in range(email_count):
+                with st.container():
+                    st.write(f"Email {i+1}")
+
+                    # Unique keys for each input
+                    use_AI_key = f"use_AI_{i}"
+                    objective_key = f"email_objective_{i}"
+
+                    # Radio button for AI use
+                    st.session_state.emails[i]['use_AI'] = st.radio("Use hyper-personalization with AI", ("Yes", "No"), index=int(st.session_state.emails[i]['use_AI']), key=use_AI_key) == "Yes"
+
+                    # Text input for email objective
+                    st.session_state.emails[i]['email_objective'] = st.text_input("Enter Email Objective:", value=st.session_state.emails[i]['email_objective'], key=objective_key)
+
+            # Button to generate email templates
+            if st.button("Generate Email Templates"):
+                for i, email_data in enumerate(st.session_state.emails):
+                    email_template = generateEmailFormat(st.session_state.client['company_summary'], st.session_state.client['icp'], email_data['email_objective'])
+                    st.json(email_template)
+    except:
+        pass
+
+    # """ 
+    # What this page needs to do:
+    # - Create new campaigns
+    # - Load and edit existing campaigns
+    # - Assign campaign to x leads from y total leads of client z at random
+    # - Add sequences to campaigns
+
+    # """
+
+
 
 
 def email_generation_page():
