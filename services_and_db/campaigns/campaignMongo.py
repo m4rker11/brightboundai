@@ -20,10 +20,8 @@ campaign_schema = {
 email_schema = {
     "subject": str,
     "body": str,
-    "call_to_action": str,
-    "personalization": str,
-    "use_AI": bool,
-    "delay": int,
+    "fields": object,
+    "useAI": bool,
 }
 
 def get_campaigns_by_client_id(client_id):
@@ -55,7 +53,15 @@ def create_campaign(campaign_name, client_id):
         "client_id": ObjectId(client_id)
     }
     result = collection.insert_one(campaign)
-    return result.acknowledged
+    return result.inserted_id
+
+def update_campaign_by_id(campaign_id, campaign):
+    """
+    Updates a campaign by id
+    """
+    result = collection.update_one({"_id": campaign_id}, {"$set": campaign})
+    print(result)
+    return result.upserted_id
 
 def add_email_to_campaign(id, email):
     """

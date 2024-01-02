@@ -40,7 +40,7 @@ def enrichRow(row, context):
     #part 1: get the linkedin profile
     linkedin_profile = linkedin.getLinkedInInfo(row['linkedIn_url'])
     if linkedin_profile is None:
-        return None
+        return None # TODO: add something to show that lead is stooopid
     #part 2: get the website content
     website_content = scraper.scrape_website_task(row['website_url'])
     if website_content is None:

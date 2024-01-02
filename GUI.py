@@ -146,9 +146,9 @@ def campaign_page():
 
     # Get campaigns for client
     campaigns = Campaigns.get_campaigns_by_client_id(client['_id'])
-    campaign_names = [campaign['name'] for campaign in campaigns]
-    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names)
-
+    campaign_names_and_ids = [(campaign['name'], campaign['_id']) for campaign in campaigns]
+    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names_and_ids, format_func=lambda x: x[0])[0]
+    campaign_id = [campaign[1] for campaign in campaign_names_and_ids if campaign[0] == chosen_campaign_name][0]
     # Add Campaign Button
     if st.button("Add Campaign"):
         st.session_state['add_campaign_clicked'] = True
@@ -158,56 +158,88 @@ def campaign_page():
         new_campaign_name = st.text_input("Enter Campaign CodeName: ")
         if st.button("Create new campaign"):
             new_campaign_client = client['_id']
-            Campaigns.create_campaign(new_campaign_name, new_campaign_client)
+            campaign_id = Campaigns.create_campaign(new_campaign_name, new_campaign_client)
             chosen_campaign_name = new_campaign_name
             st.success("Campaign added!")
             st.session_state['add_campaign_clicked'] = False  # Reset the state
 
     # Confirm Selection Button
     if st.button("Confirm Selections"):
-        campaign = Campaigns.get_campaign_by_name(chosen_campaign_name)
+        campaign = Campaigns.get_campaign_by_id(campaign_id)
         st.session_state['campaign'] = campaign
 
     try: 
-        if st.session_state['campaign'] is not None:
-        # EMAIL TEMPLATE CRAFTING
-            email_count = st.number_input("How many emails should be in the campaign?", min_value=1, max_value=10, value=5, key="email_count")
+        if 'campaign' in st.session_state:
+            recipient_count = st.number_input("Enter Recipient Count:", value=500, min_value=1)
+            email_count = st.number_input("How many emails should be in the campaign?", min_value=1, max_value=10, value=5)
 
-            # Adjust the size of session_state.emails if the number of emails changes
-            if 'emails' not in st.session_state or len(st.session_state.emails) != email_count:
-                st.session_state.emails = [{'use_AI': False, 'email_objective': ''} for _ in range(email_count)]
+            # Initialize or adjust the size of session_state.emails
+            if 'emails' not in st.session_state:
+                st.session_state.emails = [{'main_template': ''} for _ in range(email_count)]
+            elif len(st.session_state.emails) != email_count:
+                st.session_state.emails = st.session_state.emails[:email_count] + [{'main_template': ''} for _ in range(email_count - len(st.session_state.emails))]
 
-            # Create inputs for each email
+            # Create text areas for each email template
             for i in range(email_count):
                 with st.container():
                     st.write(f"Email {i+1}")
+                    email_key = f"email_template_{i}"  # Unique key for each email template
+                    email_subject_key = f"email_subject_{i}"
+                    st.session_state.emails[i]['subject'] = st.text_input("Enter Email Subject:", value=st.session_state.emails[i].get('subject', ''), key = email_subject_key)
+                    st.session_state.emails[i]['main_template'] = st.text_area("Please write the email template here:", value=st.session_state.emails[i]['main_template'], key=email_key)
+            # Confirm Templates Button
+            if st.button("Confirm Email Templates"):
+                for i, email in enumerate(st.session_state.emails):
+                    main_template = email['main_template']
+                    input_fields = {}
+                    while "{{" in main_template:
+                        start = main_template.find("{{")
+                        end = main_template.find("}}", start)
+                        input_field = main_template[start+2:end].strip()
+                        input_fields[input_field] = ''  # Initialize each input field with an empty string
+                        main_template = main_template[end+2:]
+                    st.session_state.emails[i]['input_fields'] = input_fields
 
-                    # Unique keys for each input
+            # Display input fields for each template
+            for i, email in enumerate(st.session_state.emails):
+                if 'input_fields' in email:
+                    with st.container():
+                        st.write(f"Input fields for Email {i+1}")
+                        for input_field in email['input_fields']:
+                            input_field_key = f"email_{i}_{input_field}"  # Unique key for each input field
+                            email['input_fields'][input_field] = st.text_input(f"Detailed description of {input_field}", value=email['input_fields'][input_field], key=input_field_key)
+
                     use_AI_key = f"use_AI_{i}"
                     objective_key = f"email_objective_{i}"
+                    st.session_state.emails[i]['use_AI'] = st.radio("Use hyper-personalization with AI", ("Yes", "No"), index=int(st.session_state.emails[i].get('use_AI', False)), key=use_AI_key) == "Yes"
+                    st.session_state.emails[i]['email_objective'] = st.text_input("Enter Email Objective:", value=st.session_state.emails[i].get('email_objective', ''), key=objective_key)
+            
+            email_schemas = []
+            for email in st.session_state.emails:
+                email_schema = {
+                    "subject": email['subject'] if email['subject'] != '' else None,
+                    "body": email['main_template'],
+                    "fields": email.get('input_fields', {}),
+                    "useAI": email.get('use_AI', False),
+                }
+                email_schemas.append(email_schema)
 
-                    # Radio button for AI use
-                    st.session_state.emails[i]['use_AI'] = st.radio("Use hyper-personalization with AI", ("Yes", "No"), index=int(st.session_state.emails[i]['use_AI']), key=use_AI_key) == "Yes"
+            # Button to save the campaign
+            if st.button("Save Campaign"):
+                campaign_schema = {
+                    "name": chosen_campaign_name,
+                    "client_id": client['_id'],
+                    "recipient_count": recipient_count,
+                    "status": {},  # Add logic to set the campaign status
+                    "emails": email_schemas
+                }
+                print(campaign_schema)
+                print(campaign_id)
+                Campaigns.update_campaign_by_id(campaign_id, campaign_schema)
+                st.success("Campaign saved to database.")
 
-                    # Text input for email objective
-                    st.session_state.emails[i]['email_objective'] = st.text_input("Enter Email Objective:", value=st.session_state.emails[i]['email_objective'], key=objective_key)
-
-            # Button to generate email templates
-            if st.button("Generate Email Templates"):
-                for i, email_data in enumerate(st.session_state.emails):
-                    email_template = generateEmailFormat(st.session_state.client['company_summary'], st.session_state.client['icp'], email_data['email_objective'])
-                    st.json(email_template)
-    except:
-        pass
-
-    # """ 
-    # What this page needs to do:
-    # - Create new campaigns
-    # - Load and edit existing campaigns
-    # - Assign campaign to x leads from y total leads of client z at random
-    # - Add sequences to campaigns
-
-    # """
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
 
 
 

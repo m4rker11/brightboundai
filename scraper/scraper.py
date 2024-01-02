@@ -21,4 +21,3 @@ def validate_url(url):
     else:
         return "http://" + url
 
-print(scrape_website_task("http://accuratetaxsolutions.com/"))
