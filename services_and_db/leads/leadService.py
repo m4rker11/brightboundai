@@ -43,3 +43,9 @@ def updateLead(lead)->bool:
 
 def get_unenriched_leads():
     return Leads.get_unenriched_leads()
+
+def get_leads_by_client_id(client_id):
+    return Leads.get_leads_by_client_id(client_id)
+
+def get_leads_by_campaign_id(campaign_id):
+    return Leads.get_leads_by_campaign_id(campaign_id)

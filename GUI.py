@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import random
 import enrichmentPipeline as ep
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
@@ -247,50 +248,49 @@ def campaign_page():
 def email_generation_page():
     st.title("Email Generation Tool")
 
-    # Upload the enriched CSV file
-    enriched_file = st.file_uploader("Upload Enriched CSV File", type=['csv'])
-    if enriched_file is not None:
-        data = pd.read_csv(enriched_file)
-        st.write("Preview of uploaded file:")
-        st.dataframe(data.head())
-        #load format options
-        format_options = json.load(open("emailTemplates.json", "r"))['data']
-        # Input for row range selection
-        if len(format_options) == 0:
-            st.warning("Please upload email templates in the emailTemplates.json file.")
-        newOption = st.text_input("Enter a format option: ")
-        if st.button("Add format option"):
-            #add format option to emailTemplates.json
-            # if newOption can be parsed to json:
-            try:
-                json.loads(newOption)
-                format_options.append(newOption)
-                with open("emailTemplates.json", "w") as outfile:
-                    json.dump(format_options, outfile)
-            except:
-                st.warning("Please enter a valid json format.")
-        min_row, max_row = st.slider("Select a range of rows", 1, len(data), (1, len(data)))
-        output_format = st.selectbox("Select Output Format", format_options)  # Replace with actual formats
+    """
+    choose client -> 
+    choose campaign -> 
+    get and select leads -> 
+    generate emails -> 
+    output as csv
+    """
+    # Get all clients
+    clients = Clients.get_all_clients()
+    client_names = [client['company_name'] for client in clients]
+    chosen_client_name = st.selectbox("Select Client", client_names)
+    chosen_client = Clients.get_client_by_name(chosen_client_name)
+    st.session_state.client = chosen_client
 
-        # Process and save the data
-        if st.button("Generate Emails"):
-            # Load rows from selected range
-            selected_rows = data.iloc[min_row - 1:max_row]
-            example_df = pd.DataFrame()
-            # Generate emails for each row in the range
-            for index, row in selected_rows.iterrows():
-                
-                row = writeEmailForEntry(row.to_dict(), 'Your Product Context', outputFormat=output_format)
-                while index < 5:
-                    example_df = example_df.append(row, ignore_index=True)
-                if index == 5:
-                    st.write("Example of generated emails:")
-                    st.dataframe(example_df)
-                    
-            # Save the updated data to a new CSV file
-            new_file_name = enriched_file.name.split('.')[0] + '_with_email_'+min_row+'_'+ max_row+'.csv'
-            selected_rows.to_csv(new_file_name, index=False)
-            st.success(f"Emails generated and saved to {new_file_name}!")
+    # Get campaigns for client
+    campaigns = Campaigns.get_campaigns_by_client_id(chosen_client['_id'])
+    campaign_names = [campaign['name'] for campaign in campaigns]
+    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names)
+    chosen_campaign = Campaigns.get_campaign_by_name(chosen_campaign_name)
+    st.session_state.campaign = chosen_campaign
+
+    # Get leads for campaign
+    leads = Leads.get_leads_by_client_id(chosen_client['_id'])
+    # get total number of leads without campaign_id
+    leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
+    count = len(leads_without_campaign)
+    # how many leads to generate emails for
+    recipient_count = st.number_input("Enter Recipient Count out of : "+count, value=count, min_value=1)
+    if recipient_count<count:
+        #do a random sample of leads
+        leads = random.sample(leads_without_campaign, recipient_count)
+    else:
+        leads = leads_without_campaign
+    if st.button("Generate Emails"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.text("Initializing email crafting process...")
+        ep.createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_text)
+        status_text.text("Emails Created!")
+        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
+        final_leads = Leads.get_leads_by_campaign_id(chosen_campaign['_id'])
+        st.download_button("Download Emails!", data=final_leads, file_name=lead_file_name, mime='text/csv')
+
 
 if __name__ == "__main__":
     main()

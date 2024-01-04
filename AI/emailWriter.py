@@ -150,3 +150,83 @@ def generateSummaryOutput(profile_summary, website_summary):
 
     result = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
     return json.loads(result)
+
+def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates,client_context, lead) -> dict:
+    prompt_template ="""
+    EMAIL TEMPLATES:
+    '''
+    {email_templates}
+    '''
+    Lead Info:
+    ''
+    {lead_info}
+    ''
+    Client Context:
+    '
+    {client_context}
+    '
+    You are writing a sequence of emails to send to {lead_name} from {lead_company}. Here are the rules you have to follow.
+    Rules:
+    1. The keys in the json object must be the same as the fields from the email templates shown as {{ }} in the email templates.
+    2. The values in the json object must be the personalized information from the lead.
+    3. When the values are plugged in to the email templates, the resulting emails should be the final personalized email to the lead.
+    4. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
+    5. When the values are plugged in to the email templates, the resulting emails should be coherent and sound human.
+    6. Output only the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
+    
+    OUTPUT:
+    """
+
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model_name="gpt-4-1106-preview")
+    output_parser = SimpleJsonOutputParser()
+
+    chain = prompt | model | output_parser
+    return chain.invoke({"email_templates": email_templates,
+                            "lead_info": lead,
+                            "client_context": client_context,
+                            "lead_name": lead['name'],
+                            "lead_company": lead['company']})
+
+
+def validateEmailsForLead(lead, campaign, client_context)->dict:
+    prompt_template = """
+    EMAILS:
+    '''
+    {emails}
+    '''
+    Lead Info:
+    ''
+    {lead_info}
+    ''
+    Client Context:
+    '
+    {client_context}
+    '
+    You are verifying that the sequence of emails to send to {lead_name} from {lead_company} is valid and a good email. Here are the rules you have to follow.
+    Rules:
+    1. Your Output must be a valid json object. it should be a list of json objects, each json object corresponds to an email in the sequence.
+    2. The json object must have a key "valid" with a boolean value.
+    3. If the value of "valid" is false, field "reason" must be present with a string value explaining why the email is invalid.
+    4. If the value of "valid" is true, field "reason" must not be present.
+        The following is the validity criteria for an email:
+        a. The email must be coherent and sound human.
+        b. The email must be personalized to the lead.
+        c. The email should not make any assumptions and rely only on the lead information and the client context.
+        d. The email should be under 130 words.
+        e. There should be no random capitalization.
+    5. The list should be in the same order as the emails in the sequence and of the same length.
+    6. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
+
+    OUTPUT:
+    """
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model_name="gpt-4-1106-preview")
+    output_parser = SimpleJsonOutputParser()
+
+    chain = prompt | model | output_parser
+    return chain.invoke({"emails": campaign['emails'],
+                            "lead_info": lead,
+                            "client_context": client_context,
+                            "lead_name": lead['name'],
+                            "lead_company": lead['company']})

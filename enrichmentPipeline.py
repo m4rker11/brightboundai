@@ -65,3 +65,56 @@ def writeEmailForEntry(row, product_context,**kwargs):
     for key in resultJson.keys():
         row[key] = resultJson[key]
     return row
+
+def createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_text, batch_size=5):
+    total_leads = len(leads)
+    for start_index in range(0, total_leads, batch_size):
+        end_index = min(start_index + batch_size, total_leads)
+        batch = leads[start_index:end_index]
+
+        # Set up the ThreadPoolExecutor for the current batch
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            singleBatchEmailCreationRun(batch, executor, chosen_campaign)
+        progress = end_index / total_leads
+        progress_bar.progress(progress)
+        status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_leads}")
+        
+def singleBatchEmailCreationRun(batch, executor, template):
+    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template): row for row in batch}
+    for future in as_completed(future_to_row):
+        enriched_row = future.result()
+        if enriched_row is not None:
+            Leads.updateLead(enriched_row)
+
+def writeEmailSequenceFromTemplate(lead, template):
+
+    client = Clients.get_client_by_id(lead['client_id'])
+    client_context = client['company_summary']
+    emails = template['emails']
+    emails = [email for email in emails if email['useAI']]
+
+    fields = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, lead) #TODO
+    lead['email_fields'] = fields
+    validation_result = emailValidation(lead, template, client_context)
+    if not all(result['valid'] for result in validation_result):
+        lead = fixEmails(lead, validation_result, template, client_context)
+    return lead
+
+def emailValidation(lead, campaign,client_context):
+    personalized_emails = populateCampaignForLead(lead, campaign)
+    return emailWriter.validateEmailsForLead(lead, personalized_emails, client_context)
+
+def populateCampaignForLead(lead, campaign):
+    fields = lead['email_fields']
+    emails = campaign['emails']
+    email_bodies = [email['body'] for email in emails]
+    personalized_email_bodies = []
+    for email in email_bodies:
+        # each email is a string with a key in {key} format, so we need to replace the key with the value from fields
+        for key in fields.keys():
+            email = email.replace("{"+key+"}", fields[key])
+        personalized_email_bodies.append(email)
+    return personalized_email_bodies
+
+def fixEmails(lead, validation_result, campaign, client_context):
+    pass

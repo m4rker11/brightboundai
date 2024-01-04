@@ -27,7 +27,7 @@ lead_schema = {
     'linkedIn_summary': str,
     'lead_valid': bool,
     'lead_status': str,
-    'email_formats': list,
+    'email_fields': dict,
     'created': str,
     'last_updated': str,
     'contacted': str,
@@ -99,3 +99,8 @@ def get_unenriched_leads() -> list:
     return list(collection.find({"website_summary": {"$exists": False},
                             "linkedIn_summary": {"$exists": False}}))
                             
+def get_leads_by_client_id(client_id):
+    return collection.find({"client_id": ObjectId(client_id)})
+
+def get_leads_by_campaign_id(campaign_id):
+    return collection.find({"campaign_id": ObjectId(campaign_id)})
