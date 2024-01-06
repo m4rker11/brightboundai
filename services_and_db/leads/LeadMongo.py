@@ -64,14 +64,6 @@ def validate_lead(lead):
 def get_all_leads():
     return collection.find()
 # get all contacted leads of a certain status
-def get_leads_by_status(status):
-    return collection.find({"lead_status": status, 'ignore': {"$exists": False}})
-
-def get_leads_by_campaign(campaign_id):
-    return collection.find({"campaign_id": campaign_id, 'ignore': {"$exists": False}}) 
-
-def get_contacted_leads_by_campaign(campaign_id):
-    return collection.find({"campaign_id": campaign_id, "contacted": {"$exists": True}, 'ignore': {"$exists": False}})
 
 def add_lead(lead):
     return collection.insert_one(lead)
@@ -85,12 +77,6 @@ def update_lead(id, lead):
         if lead[key] != None:
             entry[key] = lead[key]
     return collection.update_one({"_id": ObjectId(id)}, {"$set": entry})
-
-def delete_lead(id):
-    return collection.delete_one({"_id": ObjectId(id)})
-
-def ignore_lead(id):
-    return collection.update_one({"_id": ObjectId(id)}, {"$set": {"ignore": True}})
 
 def get_lead_by_email(email):
     return collection.find_one({"email": email})

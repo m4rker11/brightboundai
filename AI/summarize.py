@@ -74,3 +74,35 @@ def summarizeWebsiteContent(content, context):
                                 "product_context": context,
                                 "format": formatString1})
 
+
+def generateSummaryOutput(profile_summary, website_summary):
+    prompt_template = """
+    PROFILE SUMMARY:
+    {profile_summary}
+
+    WEBSITE SUMMARY:
+    {website_summary}
+
+    Based on the information above, provide concise key-value pairs for each of the following in a JSON format:
+    1. whatTheyDo: What the company does (3-6 words)
+    2. theirCustomers: Who are their customers (3-6 words)
+    3. theirGoals: What are their goals (3-6 words)
+    4. theirCustomersGoals: What their customers are looking to accomplish (3-6 words)
+    5. theirOffer: Their offer to their customers (3-6 words)
+    6. painPoints: What are their pain points (3-6 words)
+    7. Background: Their background (3-6 words)
+    8. Expertise: What they are experts in (3-6 words)
+    9. Role: What is their role at the company (3-6 words)
+    10. Location: Where they are based in (3-6 words)
+
+    Your response must be a valid JSON object
+
+    RESPONSE:"""
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI()
+    output_parser = SimpleJsonOutputParser()
+
+    chain = prompt | model | output_parser
+
+    result = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
+    return json.loads(result)

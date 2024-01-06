@@ -33,9 +33,9 @@ def summarizeProfileData(profile):
 def summarizeWebsiteContent(content, context):
     
     formatString = str({
-    "client_service": "3-5 word service description"
-    "client_icp": "Their ideal customer profile",
-    "offer": "the services they are offering to the ICP"
+        "client_service": "3-5 word service description",
+        "client_icp": "Their ideal customer profile",
+        "offer": "the services they are offering to the ICP"
     })
     
     prompt_template = """

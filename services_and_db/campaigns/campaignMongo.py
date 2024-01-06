@@ -63,23 +63,3 @@ def update_campaign_by_id(campaign_id, campaign):
     print(result)
     return result.upserted_id
 
-def add_email_to_campaign(id, email):
-    """
-    Adds an email to a campaign
-    """
-    result = collection.update_one({"_id": ObjectId(id)}, {"$push": {"emails": email}})
-    return result.acknowledged
-
-def add_variant_to_email(id, email_position, variant):
-    """
-    Adds a variant to an email in list[email_position]
-    """
-    result = collection.update_one({"_id": ObjectId(id)}, {"$push": {"emails."+str(email_position)+".variants": variant}})
-    return result.acknowledged
-
-def remove_variant_from_email(id, email_position, variant_position):
-    """
-    Removes a variant from an email in list[email_position]
-    """
-    result = collection.update_one({"_id": ObjectId(id)}, {"$unset": {"emails."+str(email_position)+".variants."+str(variant_position): 1}})
-    return result.acknowledged

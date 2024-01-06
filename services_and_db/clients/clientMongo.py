@@ -51,20 +51,6 @@ def update_client(id, client):
     result = collection.update_one({"_id": ObjectId(id)}, {"$set": client})
     return result.acknowledged
 
-def add_email_to_client(id, email):
-    """
-    Adds an email to a client
-    """
-    result = collection.update_one({"_id": ObjectId(id)}, {"$push": {"company_emails": email}})
-    return result.acknowledged
-
-def remove_email_from_client(id, email):
-    """
-    Removes an email from a client
-    """
-    result = collection.update_one({"_id": ObjectId(id)}, {"$pull": {"company_emails": email}})
-    return result.acknowledged
-
 def get_all_clients():
     """
     Gets all clients

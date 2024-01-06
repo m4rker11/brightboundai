@@ -57,15 +57,6 @@ def enrichRow(row, context):
     row['offer'] = website_summary['offer']
     return row
 
-
-def writeEmailForEntry(row, product_context,**kwargs):
-    outputFormat = kwargs.get('outputFormat', None)
-    resultJson = emailWriter.writeEmail(row['first_name'], row['company'], row['linkedin_summary'], row['website_summary'], product_context, outputFormat)
-    #iterate over the keys and add them to the row
-    for key in resultJson.keys():
-        row[key] = resultJson[key]
-    return row
-
 def createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_text, batch_size=5):
     total_leads = len(leads)
     for start_index in range(0, total_leads, batch_size):
