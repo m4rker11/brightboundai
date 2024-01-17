@@ -1,4 +1,6 @@
 from botasaurus import *
+
+
 @browser(cache=True, 
          parallel=20,
          reuse_driver=True)

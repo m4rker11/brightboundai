@@ -22,6 +22,7 @@ def addLeadsFromDataFrame(df)->bool:
     for index, row in df.iterrows():
         lead = row.to_dict()
         if not addLead(lead):
+            print("Failed to add lead")
             pass ### TODO: handle this
     return True
 
@@ -36,3 +37,6 @@ def get_leads_by_client_id(client_id):
 
 def get_leads_by_campaign_id(campaign_id):
     return Leads.get_leads_by_campaign_id(campaign_id)
+
+def check_if_lead_exists(email, website, client_id)->bool:
+    return Leads.check_if_lead_exists(email, website, client_id)

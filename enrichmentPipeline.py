@@ -1,8 +1,10 @@
 import AI.summarize as summarizer
+
+import difflib
+from AI.summarize import isBtoB
 import AI.emailWriter as emailWriter
 import scraper.scraper as scraper
 import linkedin.getLinkedInInfo as linkedin
-import csv
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -37,14 +39,16 @@ def enrichMongoDB(progress_bar, status_text):
 
 
 def enrichRow(row, context):
-    #part 1: get the linkedin profile
+    
+    # part 1: get the website content
+    bestUrl = chooseBestUrl(row['email'], row['website_url'], row['company'])
+    website_content = scraper.scrape_website_task(bestUrl)
+    if website_content is None or not isBtoB(website_content):
+        return stoopifyLead(row)
+    # part 2: get the linkedin profile
     linkedin_profile = linkedin.getLinkedInInfo(row['linkedIn_url'])
     if linkedin_profile is None:
-        return None # TODO: add something to show that lead is stooopid
-    #part 2: get the website content
-    website_content = scraper.scrape_website_task(row['website_url'])
-    if website_content is None:
-        return None
+        return stoopifyLead(row)
     # part 3: summarize the linkedin profile
     linkedin_summary = summarizer.summarizeProfileData(linkedin_profile)
     # part 4: summarize the website content
@@ -57,7 +61,27 @@ def enrichRow(row, context):
     row['offer'] = website_summary['offer']
     return row
 
-def createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_text, batch_size=5):
+def stoopifyLead(row):
+    row['ignore'] = True
+    return row
+
+def chooseBestUrl(email, website_url, company_name):
+    def compute_similarity(input_string, reference_string):
+        diff = difflib.ndiff(input_string, reference_string)
+        diff_count = 0
+        for line in diff:
+            if line.startswith("-"):
+                diff_count += 1
+        return 1 - (diff_count / len(input_string))
+    
+
+    emailDomain = email.split('@')[1]
+    if emailDomain in website_url:
+        return website_url
+    else:
+        return max([website_url, emailDomain], key=lambda x: compute_similarity(x, company_name))
+
+def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=5):
     total_leads = len(leads)
     for start_index in range(0, total_leads, batch_size):
         end_index = min(start_index + batch_size, total_leads)
@@ -65,21 +89,20 @@ def createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_te
 
         # Set up the ThreadPoolExecutor for the current batch
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            singleBatchEmailCreationRun(batch, executor, chosen_campaign)
+            singleBatchEmailCreationRun(batch, executor, chosen_campaign, client)
         progress = end_index / total_leads
         progress_bar.progress(progress)
         status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_leads}")
         
-def singleBatchEmailCreationRun(batch, executor, template):
-    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template): row for row in batch}
+def singleBatchEmailCreationRun(batch, executor, template, client):
+    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template, client): row for row in batch}
     for future in as_completed(future_to_row):
         enriched_row = future.result()
         if enriched_row is not None:
             Leads.updateLead(enriched_row)
 
-def writeEmailSequenceFromTemplate(lead, template):
+def writeEmailSequenceFromTemplate(lead, template, client):
 
-    client = Clients.get_client_by_id(lead['client_id'])
     client_context = client['company_summary']
     emails = template['emails']
     emails = [email for email in emails if email['useAI']]
@@ -108,4 +131,11 @@ def populateCampaignForLead(lead, campaign):
     return personalized_email_bodies
 
 def fixEmails(lead, validation_result, campaign, client_context):
+    print("THERE WAS AN ERROR")
+    print(validation_result)
+    emails = campaign['emails']
+    emails = [email for email in emails if email['useAI']]
+    print(emails)
+    print(lead['email_fields'])
+    print(lead['_id'])
     pass

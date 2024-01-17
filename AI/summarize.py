@@ -33,7 +33,25 @@ def summarizeProfileData(profile):
 
     return chain.invoke({"text": profile})
 
-
+def isBtoB(website_content):
+     # check if the content of the website implies that the company is B2B or the customers are business entities
+     prompt_template = """
+        WEBSITE CONTENT:
+        -----------
+        {website_content}
+        -----------
+        Above is the content of the front page of a website belonging to a company. 
+        Based on the content above, is this company a B2B company or does it sell to business entities?
+        If yes, return "true", otherwise return "false".
+        Your response should only contain the word "true" or "false" and nothing else.
+        RESPONSE:
+        """
+        prompt = ChatPromptTemplate.from_template(prompt_template)
+        model = ChatOpenAI(model="gpt-3.5-turbo-1106")
+        output_parser = StrOutputParser()
+        chain = prompt | model | output_parser
+        result = chain.invoke({"website_content": website_content})
+        return result == "true" or result == "True"
 
 def summarizeWebsiteContent(content, context):
         

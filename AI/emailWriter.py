@@ -7,6 +7,7 @@ from langchain.output_parsers.json import SimpleJsonOutputParser
 dotenv.load_dotenv()
 llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
 
+#TODO DEPRECATE
 def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_context, outputFormat):
     
     emailBaseFormat = base_format if base_format != None and base_format != "" else """

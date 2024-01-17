@@ -7,7 +7,7 @@ import enrichmentPipeline as ep
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
-from AI.emailWriter import generateEmailFormat
+import scraper.scraper as scraper
 # Define the functions enrichRow and enrichCSV (already provided)
 
 # Streamlit UI
@@ -67,7 +67,7 @@ def leads_page():
 
         # Column Renaming
         column_names = st.session_state.data.columns.tolist()
-        st.write("Mandatory column names: full_name, name, company, website_url, linkedIn_url, email")
+        st.write("Mandatory column names: full_name, first_name, company, website_url, linkedIn_url, email")
         st.write("Modify column names if necessary:")
         new_column_names = [st.text_input(f"Column {i+1}", column_names[i]) for i in range(len(column_names))]
 
@@ -91,6 +91,8 @@ def leads_page():
             st.dataframe(st.session_state.data.head()) #HERE THE COLUMN NAMES ARE BACK TO WHAT THEY WERE
             # add leads to mongo    
             data = st.session_state.data
+            client_ids = pd.Series([client_id for i in range(len(st.session_state.data))])
+            data['client_id'] = client_ids
             st.dataframe(data.head())
             Leads.addLeadsFromDataFrame(data)
             st.success("Leads added to client!")
@@ -242,9 +244,6 @@ def campaign_page():
     except Exception as e:
         st.error(f"An error occurred: {e}")
 
-
-
-
 def email_generation_page():
     st.title("Email Generation Tool")
 
@@ -275,7 +274,7 @@ def email_generation_page():
     leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
     count = len(leads_without_campaign)
     # how many leads to generate emails for
-    recipient_count = st.number_input("Enter Recipient Count out of : "+count, value=count, min_value=1)
+    recipient_count = st.number_input("Enter Recipient Count out of : " + str(count), value=count)
     if recipient_count<count:
         #do a random sample of leads
         leads = random.sample(leads_without_campaign, recipient_count)
@@ -285,7 +284,7 @@ def email_generation_page():
         progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Initializing email crafting process...")
-        ep.createEmailsForLeadsByTemplate(leads,chosen_campaign,progress_bar, status_text)
+        ep.createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text)
         status_text.text("Emails Created!")
         lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
         final_leads = Leads.get_leads_by_campaign_id(chosen_campaign['_id'])

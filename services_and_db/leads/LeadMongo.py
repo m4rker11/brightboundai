@@ -13,7 +13,7 @@ collection = db['leads']
 # Define the schema
 lead_schema = {
     'full_name': str,
-    'name': str,
+    'first_name': str,
     'company': str,
     'website_url': str,
     'linkedIn_url': str,
@@ -21,7 +21,13 @@ lead_schema = {
     'icp': str,
     'offer': str,
     'city': str,
-    'role': str,
+    'job_title': str,
+    'keywords': list,
+    'industry': str,
+    'company_country': str,
+    'company_state': str,
+    'company_linkedin_url': str,
+    'employees': int,
     'offer_specific': bool,
     'website_summary': str,
     'linkedIn_summary': str,
@@ -51,9 +57,10 @@ def validate_lead(lead):
         if key in lead and not isinstance(lead[key], expected_type) and lead[key] is not None:
             lead.pop(key)
 
-    required_fields = ['email', 'website_url', 'linkedIn_url', 'name']
+    required_fields = ['email', 'linkedIn_url', 'first_name']
     for field in required_fields:
         if field not in lead or lead[field] is None:
+            print(f"Lead {lead['full_name']} is missing required field {field}")
             return False
 
     return True  # If all checks pass, the lead is valid
@@ -62,7 +69,7 @@ def validate_lead(lead):
 # now we need some retrieval functions
 # get all leads
 def get_all_leads():
-    return collection.find()
+    return list(collection.find())
 # get all contacted leads of a certain status
 
 def add_lead(lead):
@@ -86,7 +93,12 @@ def get_unenriched_leads() -> list:
                             "linkedIn_summary": {"$exists": False}}))
                             
 def get_leads_by_client_id(client_id):
-    return collection.find({"client_id": ObjectId(client_id)})
+    print(ObjectId(client_id))
+    return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}}))
 
 def get_leads_by_campaign_id(campaign_id):
-    return collection.find({"campaign_id": ObjectId(campaign_id)})
+    return list(collection.find({"campaign_id": ObjectId(campaign_id)}))
+
+def check_if_lead_exists(email, website, client_Id) -> bool:
+    #check if lead with email or website exists by client id returns true if exists
+    return collection.find_one({"$or": [{"email": email}, {"website_url": website}], "client_id": ObjectId(client_Id)}) != None
