@@ -4,38 +4,14 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
-from pymongo import MongoClient
 import time
 
 #FOR LATER USE
 
 
 
-def validated(email, name, website):
-    # Implement validation logic here
-    # Return True if validated, else False
-    pass
 
-def addToMongo(entry):
-    # MongoDB connection and insertion logic here
-    pass
-
-def find_email_address(page_source):
-    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    return re.findall(email_pattern, page_source)
-
-def filter_emails(emails, excluded_domain):
-    filtered = [email for email in emails if not email.endswith(excluded_domain)]
-    return filtered[:2]
-
-def split_name(name):
-    parts = name.split()
-    first_name = parts[0] if parts else ''
-    last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
-    return first_name, last_name
-
-
-def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
+def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link, client_id):
     chrome_options = Options()
     chrome_options.add_argument(f"user-data-dir={user_data_dir}")
 
@@ -44,7 +20,7 @@ def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
 
     driver.get(apollo_link)
 
-    time.sleep(2)
+    time.sleep(60)
 
     # Rest of the helper functions like find_email_address, filter_emails, split_name go here
 
@@ -81,6 +57,8 @@ def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
 
                 location = tbody.find_element(By.CLASS_NAME, 'zp_1XZ9r').text
 
+                website_url = tbody.find_element(By.CLASS_NAME, 'zp_OotKe').get_attribute('href')
+
                 button_classes = ["zp-button", "zp_zUY3r", "zp_hLUWg", "zp_n9QPr", "zp_B5hnZ", "zp_MCSwB", "zp_IYteB"]
                 
                 try:
@@ -90,7 +68,7 @@ def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
                         email_addresses = find_email_address(driver.page_source)
                         filtered_emails = filter_emails(email_addresses, 'sentry.io')
 
-                        if len(filtered_emails) > 0 and validated(filtered_emails[0], first_name + " " + last_name, linkedin_url):
+                        if len(filtered_emails) > 0 and validated(filtered_emails[0], client_id , website_url):
                             entry = {
                                 "first_name": first_name,
                                 "last_name": last_name,
@@ -98,7 +76,10 @@ def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
                                 "company_name": company_name,
                                 "email": filtered_emails[0],
                                 "linkedin_url": linkedin_url,
-                                "phone_number": phone_number
+                                "phone_number": phone_number,
+                                "location": location,
+                                "website_url": website_url,
+                                "client_id": client_id,
                             }
                             addToMongo(entry)
 
@@ -130,8 +111,8 @@ def scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link):
     driver.quit()
 
 # Example usage of the function
-user_data_dir = r'C:\Users\YOUR_USERNAME\AppData\Local\Google\Chrome\User Data\Default'
+user_data_dir = r'C:\Users\m4rke\AppData\Local\Google\Chrome\User Data\Default'
 chrome_driver_path = './chromedriver.exe'
 apollo_link = "YOUR_APOLLO_IO_LINK"
 
-scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link)
+# scrape_and_save_leads(user_data_dir, chrome_driver_path, apollo_link)

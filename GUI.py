@@ -193,7 +193,7 @@ def campaign_page():
             # Confirm Templates Button
             if st.button("Confirm Email Templates"):
                 for i, email in enumerate(st.session_state.emails):
-                    main_template = email['main_template']
+                    main_template = email['subject']+'/n/n/n/n'+email['main_template']
                     input_fields = {}
                     while "{{" in main_template:
                         start = main_template.find("{{")
@@ -204,19 +204,37 @@ def campaign_page():
                     st.session_state.emails[i]['input_fields'] = input_fields
 
             # Display input fields for each template
+            unique_input_fields = set()
+
+            # First pass: collect all unique field names from all emails
             for i, email in enumerate(st.session_state.emails):
                 if 'input_fields' in email:
-                    with st.container():
-                        st.write(f"Input fields for Email {i+1}")
-                        for input_field in email['input_fields']:
-                            input_field_key = f"email_{i}_{input_field}"  # Unique key for each input field
-                            email['input_fields'][input_field] = st.text_input(f"Detailed description of {input_field}", value=email['input_fields'][input_field], key=input_field_key)
+                    for input_field in email['input_fields']:
+                        unique_input_fields.add(input_field)
 
+            # Second pass: Display the fields
+            for input_field in unique_input_fields:
+                with st.container():
+                    st.write(f"Input field: {input_field}")
+
+                    # Create a single input field for the unique input field
+                    input_field_key = f"unique_{input_field}"  # Unique key for each unique input field
+                    input_value = st.text_input(f"Detailed description of {input_field}", key=input_field_key)
+
+                    # Set the value for the input field in each email where it appears
+                    for i, email in enumerate(st.session_state.emails):
+                        if 'input_fields' in email and input_field in email['input_fields']:
+                            email['input_fields'][input_field] = input_value
+            for i, email in enumerate(st.session_state.emails):
+                with st.container():
+                    st.write(f"Settings for Email {i+1}")
                     use_AI_key = f"use_AI_{i}"
-                    objective_key = f"email_objective_{i}"
-                    st.session_state.emails[i]['use_AI'] = st.radio("Use hyper-personalization with AI", ("Yes", "No"), index=int(st.session_state.emails[i].get('use_AI', False)), key=use_AI_key) == "Yes"
-                    st.session_state.emails[i]['email_objective'] = st.text_input("Enter Email Objective:", value=st.session_state.emails[i].get('email_objective', ''), key=objective_key)
-            
+                    default_value = int(st.session_state.emails[i].get('use_AI', False))
+                    user_choice = st.radio(f"Use hyper-personalization with AI for Email {i+1}", 
+                               ("Yes", "No"), 
+                               index=default_value, 
+                               key=use_AI_key)
+                    st.session_state.emails[i]['use_AI'] = (user_choice == "Yes")
             email_schemas = []
             for email in st.session_state.emails:
                 email_schema = {
@@ -236,8 +254,6 @@ def campaign_page():
                     "status": {},  # Add logic to set the campaign status
                     "emails": email_schemas
                 }
-                print(campaign_schema)
-                print(campaign_id)
                 Campaigns.update_campaign_by_id(campaign_id, campaign_schema)
                 st.success("Campaign saved to database.")
 

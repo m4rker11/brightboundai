@@ -5,7 +5,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 dotenv.load_dotenv()
-llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
+# llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
 
 #TODO DEPRECATE
 def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_context, outputFormat):
@@ -61,7 +61,7 @@ def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_co
     
     RESPONSE:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI()
+    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
     output_parser = SimpleJsonOutputParser()
 
     chain = prompt | model | output_parser
@@ -92,7 +92,7 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates,client_con
     '
     You are writing a sequence of emails to send to {lead_name} from {lead_company}. Here are the rules you have to follow.
     Rules:
-    1. The keys in the json object must be the same as the fields from the email templates shown as {{ }} in the email templates.
+    1. The keys in the json object must be the same as the fields from the email templates shown as {{curly brackets}} in the email templates.
     2. The values in the json object must be the personalized information from the lead.
     3. When the values are plugged in to the email templates, the resulting emails should be the final personalized email to the lead.
     4. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
@@ -110,7 +110,7 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates,client_con
     return chain.invoke({"email_templates": email_templates,
                             "lead_info": lead,
                             "client_context": client_context,
-                            "lead_name": lead['name'],
+                            "lead_name": lead['first_name'],
                             "lead_company": lead['company']})
 
 
@@ -137,7 +137,7 @@ def validateEmailsForLead(lead, campaign, client_context)->dict:
         The following is the validity criteria for an email:
         a. The email must be coherent and sound human.
         b. The email must be personalized to the lead.
-        c. The email should not make any assumptions and rely only on the lead information and the client context.
+        c. The email should not make any strong assumptions and rely only on the lead information and the client context, slight exageration is ok.
         d. The email should be under 130 words.
         e. There should be no random capitalization.
     5. The list should be in the same order as the emails in the sequence and of the same length.
@@ -146,12 +146,12 @@ def validateEmailsForLead(lead, campaign, client_context)->dict:
     OUTPUT:
     """
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-4-1106-preview")
+    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
     output_parser = SimpleJsonOutputParser()
 
     chain = prompt | model | output_parser
-    return chain.invoke({"emails": campaign['emails'],
+    return chain.invoke({"emails": campaign,
                             "lead_info": lead,
                             "client_context": client_context,
-                            "lead_name": lead['name'],
+                            "lead_name": lead['first_name'],
                             "lead_company": lead['company']})

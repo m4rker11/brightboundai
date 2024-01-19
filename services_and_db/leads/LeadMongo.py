@@ -90,7 +90,8 @@ def get_lead_by_email(email):
 
 def get_unenriched_leads() -> list:
     return list(collection.find({"website_summary": {"$exists": False},
-                            "linkedIn_summary": {"$exists": False}}))
+                            "linkedIn_summary": {"$exists": False},
+                            "ignore": {"$ne": True}}))
                             
 def get_leads_by_client_id(client_id):
     print(ObjectId(client_id))

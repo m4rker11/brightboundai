@@ -8,9 +8,6 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from langchain.schema.output_parser import StrOutputParser
 dotenv.load_dotenv()
-llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-3.5-turbo-1106")
-
-
 
 def summarizeProfileData(profile):
     prompt_template = """
@@ -23,35 +20,17 @@ def summarizeProfileData(profile):
     Focus on recent events, accomplishments or specifics, and highlight 3 of them in the summary. 
     This will be used for personalizing a cold email.
     Use no more than 200 words.
-
-    CONCISE SUMMARY:"""
+    Your output should be a json with two fields: "profile summary" and "posts summary".
+    If either is missing, return "Not applicable" for that field.
+    CONCISE SUMMARY JSON:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI()
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106")
     output_parser = StrOutputParser()
 
     chain = prompt | model | output_parser
 
-    return chain.invoke({"text": profile})
+    return tryThrice(chain, {"text": profile})
 
-def isBtoB(website_content):
-     # check if the content of the website implies that the company is B2B or the customers are business entities
-     prompt_template = """
-        WEBSITE CONTENT:
-        -----------
-        {website_content}
-        -----------
-        Above is the content of the front page of a website belonging to a company. 
-        Based on the content above, is this company a B2B company or does it sell to business entities?
-        If yes, return "true", otherwise return "false".
-        Your response should only contain the word "true" or "false" and nothing else.
-        RESPONSE:
-        """
-        prompt = ChatPromptTemplate.from_template(prompt_template)
-        model = ChatOpenAI(model="gpt-3.5-turbo-1106")
-        output_parser = StrOutputParser()
-        chain = prompt | model | output_parser
-        result = chain.invoke({"website_content": website_content})
-        return result == "true" or result == "True"
 
 def summarizeWebsiteContent(content, context):
         
@@ -67,9 +46,9 @@ def summarizeWebsiteContent(content, context):
     
         Based on the information above provide me the following:
     
-        1. Give me a 150-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. Focus on the potential challenges and opportunities this company might face, where my product and service could potentially provide significant value.
+        1. Give me a 150-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. Focus on the potential challenges and opportunities this company might face.
     
-        2. Give me a 10 word summary of the ideal customer profile that you infer from the website content.
+        2. Give me a 10 word summary of the ideal customer profile that you infer from the website content. This ICP summary needs to start with either the word "Businesses" if the company is B2B or "Individuals" if the company is B2C. 
     
         3. Give me a 20 word summary of their offer to their ICP and the services they provide them.
     
@@ -87,10 +66,17 @@ def summarizeWebsiteContent(content, context):
         output_parser = SimpleJsonOutputParser()
     
         chain = prompt1 | model | output_parser
-        
-        return chain.invoke({"website_content": content, 
-                                "product_context": context,
-                                "format": formatString1})
+        input = {"website_content": content, "product_context": context, "format": formatString1}
+        return tryThrice(chain, input)
+
+def tryThrice(chain, input):
+    result = None
+    for i in range(2):
+        if result is None:
+            result = chain.invoke(input)
+        else:
+            break
+    return result
 
 
 def generateSummaryOutput(profile_summary, website_summary):
