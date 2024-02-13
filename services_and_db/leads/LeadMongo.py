@@ -30,7 +30,7 @@ lead_schema = {
     'employees': int,
     'offer_specific': bool,
     'website_summary': str,
-    'linkedIn_summary': str,
+    'linkedin_summary': str,
     'lead_valid': bool,
     'lead_status': str,
     'email_fields': dict,
@@ -40,7 +40,9 @@ lead_schema = {
     'campaign_context':dict,
     'campaign_id': ObjectId,
     'ignore': bool,
+    'to_be_fixed': bool,
     'client_id': ObjectId,
+    'batch_id': ObjectId,
 }
 
 def validate_lead(lead):
@@ -90,15 +92,23 @@ def get_lead_by_email(email):
 
 def get_unenriched_leads() -> list:
     return list(collection.find({"website_summary": {"$exists": False},
-                            "linkedIn_summary": {"$exists": False},
                             "ignore": {"$ne": True}}))
-                            
+
+def get_leads_for_linkedin_enrichment() -> list:
+    return list(collection.find({"linkedin_summary": {"$exists": False},
+                            "ignore": {"$ne": True}}))
+
 def get_leads_by_client_id(client_id):
-    print(ObjectId(client_id))
     return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}}))
 
+def get_fully_enriched_leads_by_client_id(client_id):
+    return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}, "linkedin_summary": {"$exists": True}, "website_summary": {"$exists": True}}))
+
+def get_leads_by_batch_id(batch_id):
+    return list(collection.find({"batch_id": ObjectId(batch_id), "ignore": {"$ne": True}}))
+
 def get_leads_by_campaign_id(campaign_id):
-    return list(collection.find({"campaign_id": ObjectId(campaign_id)}))
+    return list(collection.find({"campaign_id": ObjectId(campaign_id), "ignore": {"$ne": True}, "to_be_fixed": {"$ne": True}}))
 
 def check_if_lead_exists(email, website, client_Id) -> bool:
     #check if lead with email or website exists by client id returns true if exists

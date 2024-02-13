@@ -29,14 +29,29 @@ def addLeadsFromDataFrame(df)->bool:
 def updateLead(lead)->bool:
     return Leads.update_lead(lead['_id'], lead)
 
+def update_field_in_lead_by_id(id, field, value):
+    lead = Leads.get_lead_by_id(id)
+    lead[field] = value
+    print(lead)
+    return Leads.update_lead(id, lead)
+
 def get_unenriched_leads():
     return Leads.get_unenriched_leads()
+
+def get_leads_for_linkedin_enrichment():
+    return Leads.get_leads_for_linkedin_enrichment()
 
 def get_leads_by_client_id(client_id):
     return Leads.get_leads_by_client_id(client_id)
 
+def get_fully_enriched_leads_by_client_id(client_id):
+    return Leads.get_fully_enriched_leads_by_client_id(client_id)
+
 def get_leads_by_campaign_id(campaign_id):
     return Leads.get_leads_by_campaign_id(campaign_id)
+
+def get_leads_by_batch_id(batch_id):
+    return Leads.get_leads_by_batch_id(batch_id)
 
 def check_if_lead_exists(email, website, client_id)->bool:
     return Leads.check_if_lead_exists(email, website, client_id)

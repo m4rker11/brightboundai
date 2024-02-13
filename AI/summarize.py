@@ -1,9 +1,6 @@
 import dotenv
-import os
-from langchain.chains.llm import LLMChain
-from langchain.prompts import PromptTemplate
-import json
 from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from langchain.schema.output_parser import StrOutputParser
@@ -16,12 +13,11 @@ def summarizeProfileData(profile):
 
     ---
 
-    This is the linkedin profile of a potential prospect, summarise this person's profile and posts. 
+    This is the linkedin profile of a potential prospect, summarise this person's profile. 
     Focus on recent events, accomplishments or specifics, and highlight 3 of them in the summary. 
     This will be used for personalizing a cold email.
-    Use no more than 200 words.
-    Your output should be a json with two fields: "profile summary" and "posts summary".
-    If either is missing, return "Not applicable" for that field.
+    Use no more than 200 words and use the appropriate amount depending on the size of the linkedin profile above.
+    Your output should be a json with one field: "profile summary".
     CONCISE SUMMARY JSON:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI(model="gpt-3.5-turbo-1106")
@@ -86,27 +82,32 @@ def generateSummaryOutput(profile_summary, website_summary):
 
     WEBSITE SUMMARY:
     {website_summary}
+    Create a summary of a company profile by succinctly identifying key aspects of the company in 130 words. 
+    Begin with an overview of the company's purpose and clientele, 
+    then describe their objectives, customer ambitions, value proposition, and challenges. 
+    Detail the company's foundation, areas of expertise, and leadership roles, concluding with the geographical base. 
+    Each element is briefly articulated, aiming for clarity and brevity. 
+    The summary should encapsulate:
 
-    Based on the information above, provide concise key-value pairs for each of the following in a JSON format:
-    1. whatTheyDo: What the company does (3-6 words)
-    2. theirCustomers: Who are their customers (3-6 words)
-    3. theirGoals: What are their goals (3-6 words)
-    4. theirCustomersGoals: What their customers are looking to accomplish (3-6 words)
-    5. theirOffer: Their offer to their customers (3-6 words)
-    6. painPoints: What are their pain points (3-6 words)
-    7. Background: Their background (3-6 words)
-    8. Expertise: What they are experts in (3-6 words)
-    9. Role: What is their role at the company (3-6 words)
-    10. Location: Where they are based in (3-6 words)
+    Company's mission and operations
+    Target customer demographic
+    Company and customer objectives
+    Unique offerings to clients
+    Identified challenges and pain points
+    Company's historical background
+    Specific areas of expertise
+    Leadership or key roles within the organization
+    Company's operational location
 
-    Your response must be a valid JSON object
-
+    Only output your response in plain text.
     RESPONSE:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI()
-    output_parser = SimpleJsonOutputParser()
+    output_parser = StrOutputParser()
 
     chain = prompt | model | output_parser
 
-    result = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
-    return json.loads(result)
+    resultText = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
+    resultVector = OpenAIEmbeddings().embed_query(resultText)
+    return {"totalSummaryText": resultText, "totalSummaryVector": resultVector}
+    

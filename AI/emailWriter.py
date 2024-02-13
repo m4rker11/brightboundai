@@ -4,11 +4,12 @@ import json
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
+
+from langchain_core.output_parsers import StrOutputParser
 dotenv.load_dotenv()
 # llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
 
-#TODO DEPRECATE
-def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_context, outputFormat):
+def writeTheBestBrightBoundEmail(lead, client, outputFormat = None, base_format = None):
     
     emailBaseFormat = base_format if base_format != None and base_format != "" else """
     Hi \{ firstName \},
@@ -22,7 +23,7 @@ def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_co
         outputFormat = {
         "personalization": "Congratulations or praise based on linkedIn information and recent accomplishments.  This needs to be a standalone sentence~20 words",
 
-        "body": "I wanted to reach out because we connect [specific description of their business mentioning their niche, subsegment, and location ~ 7 words] like yours with [their ICP ~15 words] and [ICPs goals, can be found in the offer]."
+        "body": "I wanted to reach out because we turn [specific description of their business mentioning their niche, subsegment, and location ~ 7 words] like yours into client magnets. On your behalf, we get you [their ICP 7~15 words] and [ICPs goals, can be found in the offer] and connect them with you directly."
         }
         
     
@@ -30,9 +31,11 @@ def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_co
 
     Send to: {name} from {company} whose background is {linkedin_summary}
 
+    Information about {company}: {company_summary}
+
     ----
 
-    Here is the context about the product you are trying to sell:
+    You are a sales rep at {myCompany}, here is some background context:
 
     {product_context}
 
@@ -61,22 +64,44 @@ def writeEmailFromFormat(name,base_format, company, linkedin_summary, product_co
     
     RESPONSE:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
+    model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0.2)
     output_parser = SimpleJsonOutputParser()
 
     chain = prompt | model | output_parser
     return chain.invoke({  
-        "product_context": product_context,
-        "company": company,
-        "name": name,
-        "linkedin_summary": linkedin_summary,
+        "product_context": client['company_summary'],
+        "myCompany": client['company_name'],
+        "company": lead['company'],
+        "name": lead['first_name'],
+        "linkedin_summary": lead['linkedin_summary'],
         "emailBaseFormat": emailBaseFormat,
-        "output_format": outputFormat
+        "output_format": outputFormat,
+        "company_summary": {"summary": lead['website_summary'], "icp": lead['icp'], "offer": lead['offer']}
     })
 
+def emailTemplateWriterForLead(lead):
+    email = """
+    Subject: Celebrating Your Success and Learning from Others
+
+    Hi {{Your past client's first name}},
+
+    Time flies! It’s been {{months since last purchase}} months since you started using {companyName}'s services. 
+    I hope it's been great for {{your past client's company name}}.
+
+    I wanted to share a quick story. One of our clients, {{another client’s company}}, was in a similar spot as you. 
+    With our help, they managed to {{key achievement you helped them with}}. I think there’s a chance for {{your past client's company name}} to have the same success.
+
+    What do you think about a quick call to talk about it and see how we can help you even more?
+
+    Cheers,
+    {firstName}
+
+    """
+    return email.format(companyName=lead['company'], firstName=lead['first_name'])
 
 
-def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates,client_context, lead) -> dict:
+
+def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_context, lead, model = "gpt4") -> dict:
     prompt_template ="""
     EMAIL TEMPLATES:
     '''
@@ -98,12 +123,24 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates,client_con
     4. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
     5. When the values are plugged in to the email templates, the resulting emails should be coherent and sound human.
     6. Output only the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
+    7. Ignore and disregard fields called "accountSignature" and "emailTemplate". They should not be present in the output.
+    8. The output json format should be the following:
+    {{emails: [
+        {{1: {{
+            "subject": "subject of email 1",
+            "body": "full email if fields are plugged in to the template",
+            "fields": {{
+                "field1": "value1",
+                "field2": "value2"
+            }}
+        }} #etc for the rest of the emails
+    ]}}
     
     OUTPUT:
     """
-
+    model_name = "gpt-4-1106-preview" if model == "gpt4" else "gpt-3.5-turbo-1106"
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-4-1106-preview")
+    model = ChatOpenAI(model_name=model_name, temperature=0.1)
     output_parser = SimpleJsonOutputParser()
 
     chain = prompt | model | output_parser
@@ -138,15 +175,16 @@ def validateEmailsForLead(lead, campaign, client_context)->dict:
         a. The email must be coherent and sound human.
         b. The email must be personalized to the lead.
         c. The email should not make any strong assumptions and rely only on the lead information and the client context, slight exageration is ok.
-        d. The email should be under 130 words.
+        d. The email should be under 150 words.
         e. There should be no random capitalization.
+        f. The email must make complete sense and not be at all confusing.
     5. The list should be in the same order as the emails in the sequence and of the same length.
     6. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
 
     OUTPUT:
     """
     prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
+    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106", temperature=0.1)
     output_parser = SimpleJsonOutputParser()
 
     chain = prompt | model | output_parser

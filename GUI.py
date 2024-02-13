@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
-import json
+import bson
 import os
+from linkedin.linkedInScraper import scrapePeople
+from services_and_db.leads.LeadObjectConverter import *
 import random
 import enrichmentPipeline as ep
 import services_and_db.clients.clientMongo as Clients
@@ -40,7 +42,7 @@ def main():
             edit client context
     """
     # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management"])
+    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management", "Perfect First Email"])
 
     if page == "Leads":
         leads_page()
@@ -50,6 +52,8 @@ def main():
         client_management_page()
     elif page == "Campaign Management":
         campaign_page()
+    elif page == "Perfect First Email":
+        perfect_first_email_page()
 
 def leads_page():
     st.title("Lead Management Tool")   
@@ -96,7 +100,9 @@ def leads_page():
             st.dataframe(data.head())
             Leads.addLeadsFromDataFrame(data)
             st.success("Leads added to client!")
-    if st.button("Enrich ALL Leads"):
+    if st.button("Enrich ALL Leads linkedIn"):
+        scrapePeople()
+    if st.button("Enrich ALL Leads Websites"):
         progress_bar = st.progress(0)
         status_text = st.empty()
 
@@ -150,8 +156,9 @@ def campaign_page():
     # Get campaigns for client
     campaigns = Campaigns.get_campaigns_by_client_id(client['_id'])
     campaign_names_and_ids = [(campaign['name'], campaign['_id']) for campaign in campaigns]
-    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names_and_ids, format_func=lambda x: x[0])[0]
-    campaign_id = [campaign[1] for campaign in campaign_names_and_ids if campaign[0] == chosen_campaign_name][0]
+    if campaign_names_and_ids != []:
+        chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names_and_ids, format_func=lambda x: x[0])[0]
+        campaign_id = [campaign[1] for campaign in campaign_names_and_ids if campaign[0] == chosen_campaign_name][0]
     # Add Campaign Button
     if st.button("Add Campaign"):
         st.session_state['add_campaign_clicked'] = True
@@ -300,11 +307,64 @@ def email_generation_page():
         progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Initializing email crafting process...")
+        batch_id = bson.ObjectId()
+        for lead in leads:
+            lead['batch_id'] = batch_id
         ep.createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text)
         status_text.text("Emails Created!")
         lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
-        final_leads = Leads.get_leads_by_campaign_id(chosen_campaign['_id'])
-        st.download_button("Download Emails!", data=final_leads, file_name=lead_file_name, mime='text/csv')
+        final_leads = Leads.get_leads_by_batch_id(batch_id)
+        final_leads = [leadForCSV(lead) for lead in final_leads]
+        final_leads = pd.DataFrame(final_leads)
+        st.dataframe(final_leads.head())
+        st.download_button("Download Emails!", data=final_leads.to_csv(), file_name=lead_file_name, mime='text/csv')
+
+def perfect_first_email_page():
+    st.title("Highest Success Email")
+    st.text("This has a default pattern for the best opening email, first email will be overwritten")
+    # Get all clients
+    clients = Clients.get_all_clients()
+    client_names = [client['company_name'] for client in clients]
+    chosen_client_name = st.selectbox("Select Client", client_names)
+    chosen_client = Clients.get_client_by_name(chosen_client_name)
+    st.session_state.client = chosen_client
+
+    # Get campaigns for client
+    campaigns = Campaigns.get_campaigns_by_client_id(chosen_client['_id'])
+    campaign_names = [campaign['name'] for campaign in campaigns]
+    chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names)
+    chosen_campaign = Campaigns.get_campaign_by_name(chosen_campaign_name)
+    st.session_state.campaign = chosen_campaign
+
+    # Get leads for campaign
+    leads = Leads.get_fully_enriched_leads_by_client_id(chosen_client['_id'])
+    # get total number of leads without campaign_id
+    leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
+    count = len(leads_without_campaign)
+    # how many leads to generate emails for
+    recipient_count = st.number_input("Enter Recipient Count out of : " + str(count), value=5)
+    if recipient_count<count:
+        #do a random sample of leads
+        leads = random.sample(leads_without_campaign, recipient_count)
+    else:
+        leads = leads_without_campaign
+    if st.button("Generate Emails"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.text("Initializing email crafting process...")
+        #pop the first email
+        chosen_campaign['emails'].pop(0)
+        batch_id = bson.ObjectId()
+        for lead in leads:
+            lead['batch_id'] = batch_id
+        ep.createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text, perfect=True)
+        status_text.text("Emails Created!")
+        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
+        final_leads = Leads.get_leads_by_batch_id(batch_id)
+        final_leads = [leadForCSV(lead) for lead in final_leads]
+        final_leads = pd.DataFrame(final_leads)
+        st.dataframe(final_leads.head())
+        st.download_button("Download Emails!", data=final_leads.to_csv(), file_name=lead_file_name, mime='text/csv')
 
 
 if __name__ == "__main__":

@@ -60,6 +60,5 @@ def update_campaign_by_id(campaign_id, campaign):
     Updates a campaign by id
     """
     result = collection.update_one({"_id": campaign_id}, {"$set": campaign})
-    print(result)
     return result.upserted_id
 
