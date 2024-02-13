@@ -1,47 +1,26 @@
 import requests
+from proxycurl.asyncio import Proxycurl
+import asyncio
+from dotenv import load_dotenv
+import os
 
-def getLinkedInProfile(url):
-    # API endpoint
-    api_url = "https://fresh-linkedin-profile-data.p.rapidapi.com/get-linkedin-profile?linkedin_url=" + url
-    
-    # Headers required for the API request
-    headers = {
-        'X-RapidAPI-Key': "b2df7b458amsh113f4894bb87467p1d7a5fjsnd6d27660796d",
-        'X-RapidAPI-Host': "fresh-linkedin-profile-data.p.rapidapi.com"
-    }
+# Load environment variables
+load_dotenv()
 
-    # Sending a GET request to the API
-    response = requests.get(api_url, headers=headers)
+# Fetch the API key from environment variables
+api_key = os.getenv('PROXYCURL_API_KEY')
+async def getLinkedInProxyCurl(url):
+    proxycurl = Proxycurl(api_key=api_key)
+    # Fetch the person's profile
+    profile_data = await proxycurl.linkedin.person.get(url=url)
+    # Extract the about section, posts, and experiences
+    # about_section = profile_data.get('about')
+    # posts = profile_data.get('posts')
+    # experiences = profile_data.get('experiences')
+    return profile_data
 
-    # Checking if the request was successful
-    if response.status_code == 200:
-        # Return the JSON response if successful
-        return response.json()
-    else:
-        # Return an error message if the request failed
-        return "Error: Unable to fetch LinkedIn profile data"
-    
-def getProfilePosts(url):
-    # API endpoint
-    api_url = "https://fresh-linkedin-profile-data.p.rapidapi.com/get-profile-posts'?linkedin_url=" + url+"&type=posts"
-    
-    # Headers required for the API request
-    headers = {
-        'X-RapidAPI-Key': "b2df7b458amsh113f4894bb87467p1d7a5fjsnd6d27660796d",
-        'X-RapidAPI-Host': "fresh-linkedin-profile-data.p.rapidapi.com"
-    }
 
-    # Sending a GET request to the API
-    response = requests.get(api_url, headers=headers)
 
-    # Checking if the request was successful
-    if response.status_code == 200:
-        # Return the JSON response if successful
-        return response.json()
-    else:
-        # Return an error message if the request failed
-        return "Error: Unable to fetch LinkedIn profile data"
-    
 def process_linkedin_profile(linkedin_profile):
     # Extracting and formatting the first three experiences
     try:
