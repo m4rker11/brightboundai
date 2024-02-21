@@ -9,14 +9,10 @@ load_dotenv()
 
 # Fetch the API key from environment variables
 api_key = os.getenv('PROXYCURL_API_KEY')
-async def getLinkedInProxyCurl(url):
-    proxycurl = Proxycurl(api_key=api_key)
+proxycurl = Proxycurl(api_key=api_key)
+def getLinkedInProxyCurl(url):
     # Fetch the person's profile
-    profile_data = await proxycurl.linkedin.person.get(url=url)
-    # Extract the about section, posts, and experiences
-    # about_section = profile_data.get('about')
-    # posts = profile_data.get('posts')
-    # experiences = profile_data.get('experiences')
+    profile_data = proxycurl.linkedin.person.get(url=url)
     return profile_data
 
 
@@ -66,15 +62,15 @@ def process_linkedin_data(linkedin_posts, linkedin_about):
         'posts': result_list
     }
 
-def getLinkedInInfo(url):
-    # Fetching the LinkedIn profile data
-    linkedin_profile = getLinkedInProfile(url)
-    if linkedin_profile == "Error: Unable to fetch LinkedIn profile data":
-        return None
-    processed_profile = process_linkedin_profile(linkedin_profile)
-    linkedin_posts = getProfilePosts(url)
-    # Extracting the required information from the response
-    linkedin_data = process_linkedin_data(linkedin_posts, processed_profile)
+# def getLinkedInInfo(url):
+#     # Fetching the LinkedIn profile data
+#     linkedin_profile = getLinkedInProfile(url)
+#     if linkedin_profile == "Error: Unable to fetch LinkedIn profile data":
+#         return None
+#     processed_profile = process_linkedin_profile(linkedin_profile)
+#     linkedin_posts = getProfilePosts(url)
+#     # Extracting the required information from the response
+#     linkedin_data = process_linkedin_data(linkedin_posts, processed_profile)
 
-    # Returning the extracted data
-    return linkedin_data
+#     # Returning the extracted data
+#     return linkedin_data

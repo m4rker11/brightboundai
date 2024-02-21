@@ -30,6 +30,7 @@ lead_schema = {
     'employees': int,
     'offer_specific': bool,
     'website_summary': str,
+    'website_content': dict,
     'linkedin_summary': str,
     'lead_valid': bool,
     'lead_status': str,

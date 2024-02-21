@@ -1,7 +1,7 @@
 from scraper.scraper import scrape_website
 from services_and_db.leads.leadService import get_unenriched_leads, updateLead
 import difflib
-from ..AI.summarize import summarizeWebsiteContent
+from AI.summarize import summarizeWebsiteContent
 
 def chooseBestUrl(row):
     # row is a dictionary that may or may not have a website_url and email field
@@ -50,10 +50,17 @@ def enrichWebsite(row, context):
     website_content = scrape_website(bestUrl)
     if website_content is None:
         RuntimeError(f"Website content of {row['company']} is none")
+    socials = website_content.pop('socials', None)
+    row["website_content"] = website_content
+    if socials is not None:
+        row['socials'] = socials
+    
+    
     
     # Await the summarizeWebsiteContent function to ensure it completes before proceeding
     try:
         website_summary = summarizeWebsiteContent(website_content, context[row['client_id']])
+        print(website_summary)
     except:
         RuntimeError(f"Summarization of {row['company']} failed")
     if website_summary is None:

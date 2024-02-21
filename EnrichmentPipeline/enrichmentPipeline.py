@@ -1,18 +1,14 @@
-import AI.summarize as summarizer
 from services_and_db.leads.LeadObjectConverter import *
-from websiteEnrichment import enrichWebsite
-from socialEnrichment import process_linkedin_profiles
-from ..linkedin.getLinkedInInfo import getLinkedInProxyCurl
-from ..services_and_db.leads.leadService import get_leads_for_linkedin_enrichment, updateLead
-from ..AI.summarize import summarizeProfileData
+from EnrichmentPipeline.websiteEnrichment import *
+from EnrichmentPipeline.socialEnrichment import process_linkedin_profile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
-from emailEnrichment import singleBatchEmailCreationRun
+from EnrichmentPipeline.emailEnrichment import singleBatchEmailCreationRun
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def batchEnrichList(rows, progress_bar, status_text, batch_size=1):
+def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=20):
     total_rows = len(rows)
     # Process rows in batches
     clients = Clients.get_all_clients()
@@ -43,11 +39,12 @@ def singleBatchEnrichmentRun(batch, executor, context):
             print("Timeout enriching a row")
             enriched_row = None
         if enriched_row is not None:
-                Leads.updateLead(enriched_row)
+            print("Updating lead ", enriched_row['_id'])
+            Leads.updateLead(enriched_row)
 
 def enrichMongoDB(progress_bar, status_text):
     unenriched_leads = Leads.get_unenriched_leads()
-    batchEnrichList(unenriched_leads, progress_bar, status_text)
+    batchEnrichListWithWebsite(unenriched_leads, progress_bar, status_text)
 
 
 def enrichRow(row, context):   
@@ -73,13 +70,21 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
             singleBatchEmailCreationRun(batch, executor, chosen_campaign, client, perfect=perfect)
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
+
 def batchEnrichLinkedinProfiles(profiles, progress_bar, status_text, batch_size=5):
     total_profiles = len(profiles)
     for start_index in range(0, total_profiles, batch_size):
         end_index = min(start_index + batch_size, total_profiles)
         batch = profiles[start_index:end_index]
-        with asyncio.TaskGroup() as tg:
-            for profile in batch:
-                tg.create(process_linkedin_profiles(profile))
-            asyncio.run(tg)
-        update_progress(progress_bar, start_index, end_index, total_profiles, status_text)
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            future_to_profile = {executor.submit(process_linkedin_profile, profile): profile for profile in batch}
+            for future in as_completed(future_to_profile):
+                try:
+                    result = future.result()
+                except:
+                    print(future)
+                    print("Timeout enriching a row")
+                    result = None
+                if result is not None:
+                    Leads.updateLead(result)
+            update_progress(progress_bar, start_index, end_index, total_profiles, status_text)

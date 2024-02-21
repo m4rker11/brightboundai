@@ -1,4 +1,5 @@
 import dotenv
+import ast
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.prompts import ChatPromptTemplate
@@ -110,4 +111,26 @@ def generateSummaryOutput(profile_summary, website_summary):
     resultText = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
     resultVector = OpenAIEmbeddings().embed_query(resultText)
     return {"totalSummaryText": resultText, "totalSummaryVector": resultVector}
-    
+
+def extractRelevantNestedLinks(allLinks):
+    prompt_template = """
+    INTERNAL LINKS:
+    {internal_links}
+    -----
+    above is the set of all internal links found on the website. 
+    I want to find the relevant information from the website to personalize a cold email.
+    pick 3 of the above links that are most likely to contain the relevant information.
+    prioritize links about the company, its mission, its services, and its team.
+    return the 3 links as a list of strings.
+    return only the list of strings.
+    RESPONSE:
+    """
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106")
+    output_parser = StrOutputParser()
+    chain = prompt | model | output_parser 
+    try:
+        result = ast.literal_eval(chain.invoke({"internal_links": allLinks}))
+    except:
+        result = []
+    return result

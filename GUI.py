@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
 import bson
-import os
-from linkedin.linkedInScraper import scrapePeople
 from services_and_db.leads.LeadObjectConverter import *
 import random
-import EnrichmentPipeline.enrichmentPipeline as ep
+from EnrichmentPipeline.enrichmentPipeline import batchEnrichLinkedinProfiles, enrichMongoDB, createEmailsForLeadsByTemplate
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
-import scraper.scraper as scraper
 # Define the functions enrichRow and enrichCSV (already provided)
 
 # Streamlit UI
@@ -101,31 +98,43 @@ def leads_page():
             Leads.addLeadsFromDataFrame(data)
             st.success("Leads added to client!")
     if st.button("Enrich ALL Leads linkedIn"):
-        scrapePeople()
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.text("Initializing Linkedin enrichment process...")
+        batchEnrichLinkedinProfiles(Leads.get_leads_for_linkedin_enrichment(), progress_bar, status_text)
     if st.button("Enrich ALL Leads Websites"):
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        status_text.text("Initializing enrichment process...")
-        ep.enrichMongoDB(progress_bar, status_text)
+        status_text.text("Initializing Website enrichment process...")
+        enrichMongoDB(progress_bar, status_text)
         status_text.text("Enrichment Completed!")
 
 def client_management_page():
     st.title("Client Management Tool")
-      
-    company_emails = []
-    name = st.text_input("Client Name")
-    email = st.text_input("Client Email")
-    company_name = st.text_input("Company Name")
-    company_website = st.text_input("Company Website")
-    company_industry = st.text_input("Company Industry")
-    company_summary = st.text_input("Company Summary")
-    fees = st.text_input("Company Fees")
-    company_emails_text = st.text_input("Comma separated Company Emails")
-    if company_emails_text != "":
-        company_emails = company_emails_text.split(',')
-        company_emails = [email.strip() for email in company_emails]
-    if st.button("Add Client"):
+
+    # Retrieve all clients from the database
+    client_list = Clients.get_all_clients()
+    client_names = ["New Client"] + [client['name'] for client in client_list]  # Add option for adding a new client
+
+    selected_client_name = st.selectbox("Select Client or Add New", client_names)
+    selected_client = None
+
+    # Show fields for update/create with information preloaded if updating
+    st.subheader("Client Information")
+    name = st.text_input("Client Name", value=selected_client.get('name', '') if selected_client else "")
+    email = st.text_input("Client Email", value=selected_client.get('email', '') if selected_client else "")
+    company_name = st.text_input("Company Name", value=selected_client.get('company_name', '') if selected_client else "")
+    company_website = st.text_input("Company Website", value=selected_client.get('company_website', '') if selected_client else "")
+    company_industry = st.text_input("Company Industry", value=selected_client.get('company_industry', '') if selected_client else "")
+    company_summary = st.text_input("Company Summary", value=selected_client.get('company_summary', '') if selected_client else "")
+    fees = st.text_input("Company Fees", value=selected_client.get('company_fees', '') if selected_client else "")
+    company_emails_text = st.text_input("Comma separated Company Emails", value=', '.join(selected_client.get('company_emails', [])) if selected_client else "")
+
+    company_emails = [email.strip() for email in company_emails_text.split(',')] if company_emails_text else []
+
+    # Button to save changes
+    if st.button("Save Client"):
         client = {
             "name": name,
             "email": email,
@@ -136,11 +145,16 @@ def client_management_page():
             "company_emails": company_emails,
             "company_fees": fees
         }
-        Clients.create_client(client)
-        st.success("Client added!")
-    client_list = Clients.get_all_clients()
-    client_names = [client['name'] for client in client_list]
-    st.selectbox("Select Client", client_names)
+
+        if selected_client_name == "New Client":
+            # Add new client
+            Clients.create_client(client)
+            st.success("Client added!")
+        else:
+            # Update existing client
+            Clients.update_client(selected_client['_id'], client)
+            st.success("Client updated!")
+
 
 def campaign_page():
     st.title("Campaign Management Tool")
@@ -310,7 +324,7 @@ def email_generation_page():
         batch_id = bson.ObjectId()
         for lead in leads:
             lead['batch_id'] = batch_id
-        ep.createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text)
+        createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text)
         status_text.text("Emails Created!")
         lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
         final_leads = Leads.get_leads_by_batch_id(batch_id)
@@ -357,7 +371,7 @@ def perfect_first_email_page():
         batch_id = bson.ObjectId()
         for lead in leads:
             lead['batch_id'] = batch_id
-        ep.createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text, perfect=True)
+        createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text, perfect=True)
         status_text.text("Emails Created!")
         lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
         final_leads = Leads.get_leads_by_batch_id(batch_id)
