@@ -5,7 +5,7 @@ import os
 from linkedin.linkedInScraper import scrapePeople
 from services_and_db.leads.LeadObjectConverter import *
 import random
-import enrichmentPipeline as ep
+import EnrichmentPipeline.enrichmentPipeline as ep
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
