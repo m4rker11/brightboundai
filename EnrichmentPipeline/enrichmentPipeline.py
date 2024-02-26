@@ -70,21 +70,36 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
             singleBatchEmailCreationRun(batch, executor, chosen_campaign, client, perfect=perfect)
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
+def run_async_in_thread(async_func, *args, **kwargs):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(async_func(*args, **kwargs))
+    loop.close()
+    return result
 
-def batchEnrichLinkedinProfiles(profiles, progress_bar, status_text, batch_size=5):
+def batchEnrichLinkedinProfiles(profiles, progress_bar, status_text, batch_size=1):
     total_profiles = len(profiles)
+    
+    def process_profile(profile):
+        return run_async_in_thread(process_linkedin_profile, profile)
+    
     for start_index in range(0, total_profiles, batch_size):
         end_index = min(start_index + batch_size, total_profiles)
         batch = profiles[start_index:end_index]
+        
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            future_to_profile = {executor.submit(process_linkedin_profile, profile): profile for profile in batch}
+            future_to_profile = {executor.submit(process_profile, profile): profile for profile in batch}
+            
             for future in as_completed(future_to_profile):
                 try:
                     result = future.result()
-                except:
+                except Exception as e:
                     print(future)
-                    print("Timeout enriching a row")
+                    print("Error enriching a profile:", e)
                     result = None
+                
                 if result is not None:
+                    # Assuming Leads.updateLead is synchronous; if it's async, you'd need to adjust this part as well
                     Leads.updateLead(result)
-            update_progress(progress_bar, start_index, end_index, total_profiles, status_text)
+        
+        update_progress(progress_bar, start_index, end_index, total_profiles, status_text)
