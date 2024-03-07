@@ -30,7 +30,25 @@ def summarizeProfileData(profile):
 
     return tryThrice(chain, {"text": profile})
 
-
+def extractInterestingThing(content):
+    prompt_template = """
+    WEBSITE CONTENT:
+    {website_content}
+    -----
+    This page contains interesting details that are about either the staff or the company itself. e.g. Personal story, origin of the company, hardships, or something else unique or relatable.
+    Extract this most interesting story/observation in a 100 words or less summary, keep all details and specifics of the story/observation in the summary.
+    Return the json with two fields: "interesting_thing" and "summary".
+    "interesting_thing": the name of the interesting thing you found in 2-5 words with _ as a separator. e.g. "personal_story"
+    "summary": should be the summary of the interesting thing you found.
+    Only output the json.
+    RESPONSE:
+    """
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106")
+    output_parser = SimpleJsonOutputParser()
+    chain = prompt | model | output_parser
+    result = chain.invoke({"website_content": content})
+    return result
 def summarizeWebsiteContent(content, context):
         
         formatString1 = str({
@@ -122,9 +140,18 @@ def extractRelevantNestedLinks(allLinks):
     above is the set of all internal links found on the website. 
     I want to find the relevant information from the website to personalize a cold email.
     pick 3 of the above links that are most likely to contain the relevant information.
-    prioritize links about the company, its mission, its services, and its team.
+    Do not output the same link twice, move down the priority list.
+    If http and https are both present, choose the http link.
+    Prioritize links in the following order, one of each:
+    1. Something weird that stands out and not often found on other websites 
+    2. About Founder/CEO
+    3. About us/our story 
+    4. Mission statement
+    5. Our team
+    6. Testimonials
     return the 3 links as a list of strings.
     return only the list of strings.
+    your response can NOT contain duplicates.
     RESPONSE:
     """
     prompt = ChatPromptTemplate.from_template(prompt_template)

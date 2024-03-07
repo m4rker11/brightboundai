@@ -1,7 +1,7 @@
 from scraper.scraper import scrape_website
 from services_and_db.leads.leadService import get_unenriched_leads, updateLead
 import difflib
-from AI.summarize import summarizeWebsiteContent
+from AI.summarize import summarizeWebsiteContent, extractInterestingThing
 
 def chooseBestUrl(row):
     # row is a dictionary that may or may not have a website_url and email field
@@ -61,9 +61,16 @@ def enrichWebsite(row, context):
     
     # Await the summarizeWebsiteContent function to ensure it completes before proceeding
     try:
-        print(f"Summarizing {row['company']}")
-        website_summary = summarizeWebsiteContent(website_content, context[row['client_id']])
-        print(website_summary)
+        website_summary = summarizeWebsiteContent(website_content["home"], context[row['client_id']])
+        interestings = {}
+        for key in website_content['internal']:
+            if key != "home":
+                print(f"Summarizing {key}")
+                item = website_content['internal'][key]
+                interesting = extractInterestingThing(str(item))
+                print(interesting)
+                if len(interesting.keys()) == 2:
+                    interestings[interesting["interesting_thing"]] = interesting["summary"]
     except:
         print(f"Summarization of {row['company']} failed")
         RuntimeError(f"Summarization of {row['company']} failed")
@@ -73,9 +80,7 @@ def enrichWebsite(row, context):
     row['website_summary'] = website_summary['summary']
     row['icp'] = website_summary['icp']
     row['offer'] = website_summary['offer']
-    if not isBtoB(website_summary['icp']):
-        print(f"Website {row['company']} is not B2B")
-        RuntimeError(f"Website {row['company']} is not B2B")
+    row['interestings'] = interestings
         
     return row
 

@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from urllib.parse import urlparse, urljoin
 
 def scrape_website(url, timeout=60):
-    @browser(cache=True, parallel=20, reuse_driver=True, data=[url], close_on_crash=True)
+    @browser(cache=False, parallel=20, reuse_driver=True, data=[url], close_on_crash=True)
     def scrape_website_task(driver: AntiDetectDriver, data):
         url = validate_url(data)
         returnObj = {}
@@ -12,7 +12,7 @@ def scrape_website(url, timeout=60):
         innerHtml = driver.bs4()
         allLinks = extract_urls_from_html(innerHtml)
         socialUrls = ["facebook.com/",  "twitter.com/", "linkedin.com/", "instagram.com/", "youtube.com/"]
-        socials = [link for link in allLinks if any(socialUrl in link for socialUrl in socialUrls)]
+        socials = list(set([link for link in allLinks if any(socialUrl in link for socialUrl in socialUrls)]))
         returnObj["socials"] = socials
         allLinks = [link for link in allLinks if not any(socialUrl in link for socialUrl in socialUrls)]
         allLinks = [link.split("#")[0] for link in allLinks]
@@ -21,7 +21,6 @@ def scrape_website(url, timeout=60):
 
         internal_urls = []
         linksSet = list(set(allLinks))
-        print(linksSet)
         if linksSet is not None:
             for link in linksSet:
                 # Join relative URLs to the base URL
@@ -32,11 +31,10 @@ def scrape_website(url, timeout=60):
                 # Check if the link belongs to the same domain
                 if link_base == base:
                     internal_urls.append(link)
-        whole = driver.text("html")
-        returnObj[url] = whole
-        # Remove duplicates
-        internal_urls = list(set(internal_urls))
-        
+
+        whole = extract_text_from_soup(innerHtml)
+        returnObj["home"] = whole
+        print(internal_urls)
         internal_urls = extractRelevantNestedLinks(internal_urls)
         print(internal_urls)
         if len(internal_urls)>1:
@@ -44,12 +42,23 @@ def scrape_website(url, timeout=60):
             for url in internal_urls:
                 # if url contains the base url redirect to the url else append the base url to the url
                 driver.get(url=url)
-                returnObj["internal"][url] = driver.text("html")
+                returnObj["internal"][url] = extract_text_from_soup(driver.bs4())
         return returnObj
     try:
         return scrape_website_task(url)
     except:
         return None
+
+
+def extract_text_from_soup(soup):
+    tags_to_remove = ['a', 'button', 'nav', 'footer', 'script', 'style']
+
+    for tag in tags_to_remove:
+        for element in soup.find_all(tag):
+            element.decompose()
+    text = soup.get_text(separator=' ', strip=True)
+    return text
+
 
 def extract_urls_from_html(html_content):
     
