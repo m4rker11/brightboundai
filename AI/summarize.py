@@ -18,7 +18,9 @@ def summarizeProfileData(profile):
     Focus on recent events, accomplishments or specifics, and highlight 3 of them in the summary. 
     This will be used for personalizing a cold email.
     Use no more than 200 words and use the appropriate amount depending on the size of the linkedin profile above.
-    Your output should be a json with one field: "profile summary".
+    If this profile has made any relevant posts or articles, 
+    add an additional field "post summary" which highlights something positive in one of the latest posts or articles.
+    Your output should be a json with one field: "profile summary" and "post summary" if applicable.
     CONCISE SUMMARY JSON:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI(model="gpt-3.5-turbo-1106")
@@ -45,7 +47,7 @@ def summarizeWebsiteContent(content, context):
     
         1. Give me a 150-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. Focus on the potential challenges and opportunities this company might face.
     
-        2. Give me a 10 word summary of the ideal customer profile that you infer from the website content. This ICP summary needs to start with either the word "Businesses" if the company is B2B or "Individuals" if the company is B2C. 
+        2. Give me a 20 word summary of the ideal customer profile that you infer from the website content. This ICP summary needs to start with either the word "Businesses" if the company is B2B or "Individuals" if the company is B2C. 
     
         3. Give me a 20 word summary of their offer to their ICP and the services they provide them.
     

@@ -1,8 +1,9 @@
 from services_and_db.leads.LeadObjectConverter import *
 from EnrichmentPipeline.websiteEnrichment import *
-from EnrichmentPipeline.socialEnrichment import process_linkedin_profile
+from EnrichmentPipeline.socialEnrichment import getLinkedInProxyCurl
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import asyncio
+from AI.summarize import summarizeProfileData
+import time
 from EnrichmentPipeline.emailEnrichment import singleBatchEmailCreationRun
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
@@ -18,7 +19,7 @@ def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=20):
         batch = rows[start_index:end_index]
 
         # Set up the ThreadPoolExecutor for the current batch
-        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+        with ThreadPoolExecutor(max_workers=batch_size,) as executor:
             singleBatchEnrichmentRun(batch, executor, context)
         progress = end_index / total_rows
         progress_bar.progress(progress)
@@ -33,7 +34,7 @@ def singleBatchEnrichmentRun(batch, executor, context):
     future_to_row = {executor.submit(enrichRow, row, context): row for row in batch}
     for future in as_completed(future_to_row):
         try:
-            enriched_row = future.result()
+            enriched_row = future.result(timeout=60)
         except:
             print(future)
             print("Timeout enriching a row")
@@ -70,36 +71,40 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
             singleBatchEmailCreationRun(batch, executor, chosen_campaign, client, perfect=perfect)
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
-def run_async_in_thread(async_func, *args, **kwargs):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(async_func(*args, **kwargs))
-    loop.close()
-    return result
+def fetch_and_update(profile):
 
-def batchEnrichLinkedinProfiles(profiles, progress_bar, status_text, batch_size=1):
-    total_profiles = len(profiles)
-    
-    def process_profile(profile):
-        return run_async_in_thread(process_linkedin_profile, profile)
-    
-    for start_index in range(0, total_profiles, batch_size):
-        end_index = min(start_index + batch_size, total_profiles)
-        batch = profiles[start_index:end_index]
+    url = profile.get('linkedIn_url')
+    print(url)
+    if url:
         
+
+        profile_info = getLinkedInProxyCurl(url)
+        print(profile_info)
+        profile['linkedInPage'] = profile_info
+        profile['linkedInSummary'] = summarizeProfileData(profile_info)
+        print(profile['linkedInSummary'])
+        updateLead(profile)
+
+def singleBatchLinkedinEnrichmentRun(batch, executor):
+    future_to_profile = {executor.submit(fetch_and_update, profile): profile for profile in batch}
+    for future in as_completed(future_to_profile):
+        try:
+            future.result(timeout=60)
+        except:
+            print("Timeout enriching a row")
+            pass
+
+def fetch_and_update_profiles(profiles, progress_bar, status_text):
+    batch_size = 5  # Maximum number of URLs to process at once
+
+
+    for start_index in range(0, len(profiles), batch_size):
+        end_index = min(start_index + batch_size, len(profiles))
+        current_batch = profiles[start_index:end_index]
+
+        # Create a list of coroutines for the current batch
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            future_to_profile = {executor.submit(process_profile, profile): profile for profile in batch}
-            
-            for future in as_completed(future_to_profile):
-                try:
-                    result = future.result()
-                except Exception as e:
-                    print(future)
-                    print("Error enriching a profile:", e)
-                    result = None
-                
-                if result is not None:
-                    # Assuming Leads.updateLead is synchronous; if it's async, you'd need to adjust this part as well
-                    Leads.updateLead(result)
-        
-        update_progress(progress_bar, start_index, end_index, total_profiles, status_text)
+            singleBatchLinkedinEnrichmentRun(current_batch, executor)
+
+        # Update the progress on the Streamlit UI
+        update_progress(progress_bar, start_index, end_index, len(profiles), status_text)

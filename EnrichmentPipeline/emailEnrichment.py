@@ -44,7 +44,7 @@ def writeEmailSequenceFromTemplate(lead, template, client, perfect):
     print("number of emails: ", len(emails))
     if len(emails) != 0:
         try:
-            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="stoopid") 
+            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
             lead = extractFields(campaign_context, lead, field_keys, email_template)
         except:
             usedGPT4 = True

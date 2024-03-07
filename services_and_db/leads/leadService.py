@@ -7,7 +7,7 @@ def addLead(lead)->bool:
     if Leads.validate_lead(lead):
         db_lead = Leads.get_lead_by_email(lead['email'])
         if db_lead!= None:
-            print("Updating lead")
+            print("Updating lead ", db_lead['_id'])
             return Leads.update_lead(db_lead['_id'], lead)
         else:
             print("Adding lead")

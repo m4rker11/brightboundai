@@ -124,7 +124,8 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_co
     5. When the values are plugged in to the email templates, the resulting emails should be coherent and sound human.
     6. Output only the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
     7. Ignore and disregard fields called "accountSignature" and "emailTemplate". They should not be present in the output.
-    8. The output json format should be the following:
+    8. If a field has a word count limit, do not exceed the limit.
+    9. The output json format should be the following:
     {{emails: [
         {{1: {{
             "subject": "subject of email 1",
@@ -138,7 +139,7 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_co
     
     OUTPUT:
     """
-    model_name = "gpt-4-1106-preview" if model == "gpt4" else "gpt-3.5-turbo-1106"
+    model_name = "gpt-4-0125-preview" if model == "gpt4" else "gpt-3.5-turbo-1106"
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI(model_name=model_name, temperature=0.1)
     output_parser = SimpleJsonOutputParser()

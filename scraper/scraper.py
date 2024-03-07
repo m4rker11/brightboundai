@@ -45,22 +45,11 @@ def scrape_website(url, timeout=60):
                 # if url contains the base url redirect to the url else append the base url to the url
                 driver.get(url=url)
                 returnObj["internal"][url] = driver.text("html")
-
-        return {
-            url: whole
-
-        }
-    
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(scrape_website_task)
-        try:
-            # Wait for the result, with timeout
-            result = future.result(timeout=timeout)
-            return result
-        except TimeoutError:
-            executor.shutdown(wait=False)
-            print(f"Scraping {url} timed out after {timeout} seconds.")
-            return None
+        return returnObj
+    try:
+        return scrape_website_task(url)
+    except:
+        return None
 
 def extract_urls_from_html(html_content):
     

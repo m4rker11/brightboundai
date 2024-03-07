@@ -44,10 +44,12 @@ def compute_similarity(input_string, reference_string):
 
 
 def enrichWebsite(row, context):
-    
+
     # part 1: get the website content
     bestUrl = chooseBestUrl(row)
+
     website_content = scrape_website(bestUrl)
+
     if website_content is None:
         RuntimeError(f"Website content of {row['company']} is none")
     socials = website_content.pop('socials', None)
@@ -59,11 +61,14 @@ def enrichWebsite(row, context):
     
     # Await the summarizeWebsiteContent function to ensure it completes before proceeding
     try:
+        print(f"Summarizing {row['company']}")
         website_summary = summarizeWebsiteContent(website_content, context[row['client_id']])
         print(website_summary)
     except:
+        print(f"Summarization of {row['company']} failed")
         RuntimeError(f"Summarization of {row['company']} failed")
     if website_summary is None:
+        print(f"Website summary of {row['company']} is none")
         RuntimeError(f"Website summary of {row['company']} is none")
     row['website_summary'] = website_summary['summary']
     row['icp'] = website_summary['icp']

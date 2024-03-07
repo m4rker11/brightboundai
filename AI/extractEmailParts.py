@@ -33,9 +33,10 @@ def summarizeProfileData(profile):
 def summarizeWebsiteContent(content, context):
     
     formatString = str({
-        "client_service": "3-5 word service description",
+        "client_service": "service description",
         "client_icp": "Their ideal customer profile",
-        "offer": "the services they are offering to the ICP"
+        "offer": "the services they are offering to the ICP",
+        "pain_points": "3 pain points they might be experiencing in regard to client aquisition"
     })
     
     prompt_template = """
@@ -50,6 +51,8 @@ def summarizeWebsiteContent(content, context):
 
     3. Give me a 20 word summary of their offer to their ICP and the services they provide them, only talk about the website content in this section, not my product.
 
+    4. Give me 100 word summary of 3 possible pain points they might be experiencing in regard to client acquisition, only talk about the website content in this section, not my product.
+    
     CONTEXT ABOUT MY PRODUCT:
 
     {product_context}

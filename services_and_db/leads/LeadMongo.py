@@ -44,6 +44,7 @@ lead_schema = {
     'to_be_fixed': bool,
     'client_id': ObjectId,
     'batch_id': ObjectId,
+    'group': str,
 }
 
 def validate_lead(lead):

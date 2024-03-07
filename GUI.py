@@ -3,7 +3,7 @@ import pandas as pd
 import bson
 from services_and_db.leads.LeadObjectConverter import *
 import random
-from EnrichmentPipeline.enrichmentPipeline import batchEnrichLinkedinProfiles, enrichMongoDB, createEmailsForLeadsByTemplate
+from EnrichmentPipeline.enrichmentPipeline import fetch_and_update_profiles, enrichMongoDB, createEmailsForLeadsByTemplate
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
@@ -11,33 +11,6 @@ import services_and_db.campaigns.campaignMongo as Campaigns
 
 # Streamlit UI
 def main():
-    """ page choices: 
-        add leads to mongo
-            upload csv
-            confirm column names
-            add leads to mongo
-        enrich leads by query
-            enrich all unenriched leads
-            enrich by client id
-            enrich by campaign id
-        generate emails
-            generate template
-                generate follow up template
-            edit template
-            enrich with email template by campaign id and client id
-        
-        client setup
-            add client
-                assets
-                context
-                offer
-                guarantee
-                guidelines
-            create campaign
-            add leads to campaign
-            add email template
-            edit client context
-    """
     # Page selection
     page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management", "Perfect First Email"])
 
@@ -84,24 +57,35 @@ def leads_page():
             st.warning("Please add clients before adding leads.")
         st.write("Select a client to add leads to:")
         client_name = st.selectbox("Select Client", client_names)
+        group = st.text_input("Enter Group Name")
         if st.button("Add Leads to Client"):
             # add client_id to each row
             client = Clients.get_client_by_name(client_name)
             client_id = client['_id']
             st.session_state.data = st.session_state.data.assign(client_id=client_id)
-            st.dataframe(st.session_state.data.head()) #HERE THE COLUMN NAMES ARE BACK TO WHAT THEY WERE
+            st.dataframe(st.session_state.data.head()) 
             # add leads to mongo    
             data = st.session_state.data
             client_ids = pd.Series([client_id for i in range(len(st.session_state.data))])
+            groups = pd.Series([group for i in range(len(st.session_state.data))])
             data['client_id'] = client_ids
+            data['group'] = groups
             st.dataframe(data.head())
             Leads.addLeadsFromDataFrame(data)
             st.success("Leads added to client!")
+    fraction = st.number_input("Enter fraction of leads to enrich" , value=1.0, min_value=0.0, max_value=1.0, step=0.1)
+    clients = Clients.get_all_clients()
+    client_names = [client['company_name'] for client in clients]
+    client_name = st.selectbox("Select Client to Enrich", client_names)
+    client = Clients.get_client_by_name(client_name)
     if st.button("Enrich ALL Leads linkedIn"):
         progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Initializing Linkedin enrichment process...")
-        batchEnrichLinkedinProfiles(Leads.get_leads_for_linkedin_enrichment(), progress_bar, status_text)
+        profiles = Leads.get_leads_for_linkedin_enrichment()
+        profiles = [lead for lead in profiles if lead['client_id'] == client['_id']]
+        profiles = random.sample(profiles, int(len(profiles)*fraction))
+        fetch_and_update_profiles(profiles, progress_bar, status_text)
     if st.button("Enrich ALL Leads Websites"):
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -307,6 +291,13 @@ def email_generation_page():
 
     # Get leads for campaign
     leads = Leads.get_leads_by_client_id(chosen_client['_id'])
+    linkedInEnriched = st.checkbox("Use LinkedIn Enriched Leads")
+    if linkedInEnriched:
+        leads = [lead for lead in leads if 'linkedInSummary' in lead]
+    else:
+        leads = [lead for lead in leads if 'linkedInSummary' not in lead]
+    
+
     # get total number of leads without campaign_id
     leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
     count = len(leads_without_campaign)
@@ -326,7 +317,7 @@ def email_generation_page():
             lead['batch_id'] = batch_id
         createEmailsForLeadsByTemplate(chosen_client, leads,chosen_campaign,progress_bar, status_text)
         status_text.text("Emails Created!")
-        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
+        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+" "+str(count)+".csv"
         final_leads = Leads.get_leads_by_batch_id(batch_id)
         final_leads = [leadForCSV(lead) for lead in final_leads]
         final_leads = pd.DataFrame(final_leads)

@@ -20,6 +20,7 @@ client_schema = {
     "company_emails": list,
     "company_fees": str,
     "icp": str,
+    "groups": list,
     
 }
 
