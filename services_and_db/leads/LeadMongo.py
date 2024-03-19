@@ -2,13 +2,16 @@ from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv
 import os
+import requests
 # get connetion string from .env file
 load_dotenv()
 connection_string = os.getenv("MONGO_CONNECTION_STRING")
+api_key = os.getenv("ABSTRACT_API_KEY")
 # Connect to MongoDB
 client = MongoClient(connection_string)
 db = client['brightbound']
 collection = db['leads']
+
 
 # Define the schema
 lead_schema = {
@@ -47,6 +50,11 @@ lead_schema = {
     'group': str,
 }
 
+def validate_email(lead):
+    url = "https://emailvalidation.abstractapi.com/v1/?api_key={api_key}&email={email}".format(api_key=api_key, email=lead['email'])
+    response = requests.get(url)
+    return response.json()['deliverability'] == "DELIVERABLE"
+
 def validate_lead(lead):
     if not isinstance(lead, dict):
         raise ValueError("Lead must be a dictionary")
@@ -77,6 +85,8 @@ def get_all_leads():
 # get all contacted leads of a certain status
 
 def add_lead(lead):
+    if not validate_lead(lead):
+        lead['ignore'] = True
     return collection.insert_one(lead)
 
 def get_lead_by_id(id):

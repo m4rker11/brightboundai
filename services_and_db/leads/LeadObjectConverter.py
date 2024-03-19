@@ -33,13 +33,16 @@ lead_schema = {
 }"""
 def leadForCSV(lead) -> dict:
     # Initialize the return object with fields marked both or CSV
+    if lead.get('campaign_context', None) is not None:
+        personalization = lead['campaign_context'].get('personalization', None)
     result = {
         "full_name": lead.get('full_name', ''),
         "first_name": lead.get('first_name', ''),
         "company": lead.get('company', ''),
         "email": lead.get('email', ''),
         "website_url": lead.get('website_url', ''),
-        "linkedIn_url": lead.get('linkedIn_url', '')
+        "linkedIn_url": lead.get('linkedIn_url', ''),
+        "personalization": personalization,
     }
 
     # Check if 'email_fields' exists and is a dictionary, then add its key-value pairs to the result

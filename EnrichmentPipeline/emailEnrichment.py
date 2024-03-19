@@ -18,7 +18,7 @@ def update_progress(progress_bar, start_index, end_index, total_leads, status_te
     progress_bar.progress(progress)
     status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_leads}")
 def singleBatchEmailCreationRun(batch, executor, template, client, perfect):
-    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template, client, perfect): row for row in batch}
+    future_to_row = {executor.submit(writeEmailSequenceFromTemplate_DefaultPersonalization, row, template, client): row for row in batch}
     for future in as_completed(future_to_row):
         enriched_row = future.result()
         if enriched_row is not None:
@@ -58,15 +58,48 @@ def writeEmailSequenceFromTemplate(lead, template, client, perfect):
         if fields[key] == "" or fields[key] == None:
             error = True
 
+    lead = confirm_email_structure(lead, template, client_context, emails, field_keys, email_template, usedGPT4, error)
+    return lead
+
+def writeEmailSequenceFromTemplate_DefaultPersonalization(lead, template, client):
+    personalization_data = {"website": lead.get('interestings', None),
+                            "linkedin": lead.get('linkedin_summary', None)}
+    print(personalization_data)
+    client_context = client['company_summary']
+    emails = template['emails']
+    for i in range(len(emails)):
+        emails[i]['number'] = i+1
+    emails = [email for email in emails if email['useAI']]
+    lead['campaign_id'] = template['_id']
+    field_keys = set()  # Initialize an empty set to store unique field keys
+    campaign_context = {}
+    personalization = emailWriter.writePersonalization(lead, client, personalization_data)
+    if len(emails) != 0:
+        try:
+            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
+            lead = extractFields(campaign_context, lead, field_keys,None)
+        except:
+            lead['to_be_fixed'] = True
+            return lead
+    else:
+        lead = extractFields(campaign_context, lead, field_keys, None)
+    campaign_context['personalization'] = personalization
+    fields = lead['email_fields']
+    error = False
+    for key in fields.keys():
+        if fields[key] == "" or fields[key] == None:
+            error = True
+
+    # lead = confirm_email_structure(lead, template, client_context, emails, field_keys, None, True, error)
+    return lead
+
+
+def confirm_email_structure(lead, template, client_context, emails, field_keys, email_template, usedGPT4, error):
     validation_result = emailValidation(lead, template, client_context)
     
     if not all(result['valid'] for result in validation_result) or error:
-        if not usedGPT4:
-            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
-            lead = extractFields(campaign_context, lead, field_keys, email_template)
-        else:
-            lead['to_be_fixed'] = True
-            lead['error'] = validation_result
+        lead['to_be_fixed'] = True
+        lead['error'] = validation_result
     return lead
 
 def extractFields(campaign_context, lead, field_keys, email_template):

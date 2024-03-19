@@ -15,12 +15,11 @@ def summarizeProfileData(profile):
     ---
 
     This is the linkedin profile of a potential prospect, summarise this person's profile. 
-    Focus on recent events, accomplishments or specifics, and highlight 3 of them in the summary. 
-    This will be used for personalizing a cold email.
     Use no more than 200 words and use the appropriate amount depending on the size of the linkedin profile above.
-    If this profile has made any relevant posts or articles, 
-    add an additional field "post summary" which highlights something positive in one of the latest posts or articles.
-    Your output should be a json with one field: "profile summary" and "post summary" if applicable.
+    In addition to the summary, provide interesting personal details or observations that can be used to personalize a cold email.
+    These details can be about a post they made, article they wrote, personal story, drastic career change, polarizing opinion, or something else unique or relatable. 
+    add an additional field "interestings" with a list of 3 interesting items which highlight 3 details from the above.
+    Your output should be a json with one field: "profile summary" and "interestings".
     CONCISE SUMMARY JSON:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI(model="gpt-3.5-turbo-1106")
