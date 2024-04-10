@@ -3,7 +3,7 @@ import pandas as pd
 import bson
 from services_and_db.leads.LeadObjectConverter import *
 import random
-from EnrichmentPipeline.enrichmentPipeline import fetch_and_update_profiles, enrichMongoDB, createEmailsForLeadsByTemplate
+from EnrichmentPipeline.enrichmentPipeline import fetch_and_update_profiles, enrichMongoDB, createEmailsForLeadsByTemplate, verifyEmailsForClient
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
@@ -93,6 +93,12 @@ def leads_page():
         status_text.text("Initializing Website enrichment process...")
         enrichMongoDB(progress_bar, status_text)
         status_text.text("Enrichment Completed!")
+    if st.button("Verify Client Emails"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.text("Initializing email verification process...")
+        verifyEmailsForClient(client['_id'], progress_bar, status_text)
+        status_text.text("Email Verification Completed!")
 
 def client_management_page():
     st.title("Client Management Tool")
@@ -302,7 +308,7 @@ def email_generation_page():
     leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
     count = len(leads_without_campaign)
     # how many leads to generate emails for
-    recipient_count = st.number_input("Enter Recipient Count out of : " + str(count), value=count)
+    recipient_count = st.number_input("Enter Recipient Count out of : " + str(count), value=1)
     if recipient_count<count:
         #do a random sample of leads
         leads = random.sample(leads_without_campaign, recipient_count)

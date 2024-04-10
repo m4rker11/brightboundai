@@ -9,6 +9,7 @@ load_dotenv()
 
 # Fetch the API key from environment variables
 api_key = os.getenv('PROXYCURL_API_KEY')
+print(api_key)
 proxycurl = Proxycurl(api_key=api_key)
 async def getLinkedInProxyCurl(url):
     # Fetch the person's profile

@@ -33,8 +33,6 @@ lead_schema = {
 }"""
 def leadForCSV(lead) -> dict:
     # Initialize the return object with fields marked both or CSV
-    if lead.get('campaign_context', None) is not None:
-        personalization = lead['campaign_context'].get('personalization', None)
     result = {
         "full_name": lead.get('full_name', ''),
         "first_name": lead.get('first_name', ''),
@@ -42,7 +40,6 @@ def leadForCSV(lead) -> dict:
         "email": lead.get('email', ''),
         "website_url": lead.get('website_url', ''),
         "linkedIn_url": lead.get('linkedIn_url', ''),
-        "personalization": personalization,
     }
 
     # Check if 'email_fields' exists and is a dictionary, then add its key-value pairs to the result
@@ -53,7 +50,7 @@ def leadForCSV(lead) -> dict:
     return result
 
 
-def leadForEmailWriter(lead) -> dict:
+def leadForEmailWriter(lead, personalization_data) -> dict:
     # Use the get method with a default value for each key
     return {
         "first_name": lead.get('first_name', ''),
@@ -67,7 +64,6 @@ def leadForEmailWriter(lead) -> dict:
         "industry": lead.get('industry', ''),
         "company_country": lead.get('company_country', ''),
         "company_state": lead.get('company_state', ''),
-        "website_summary": lead.get('website_summary', ''),
-        "linkedin_summary": lead.get('linkedin_summary', ''),
-        "employees": lead.get('employees', '')
+        "employees": lead.get('employees', ''),
+        "additional_info": personalization_data
     }

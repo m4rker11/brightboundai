@@ -1,7 +1,7 @@
 from scraper.scraper import scrape_website
 from services_and_db.leads.leadService import get_unenriched_leads, updateLead
 import difflib
-from AI.summarize import summarizeWebsiteContent, extractInterestingThing
+from AI.summarize import summarizeWebsiteContent, extractInterestingThing, inferServiceInfo
 
 def chooseBestUrl(row):
     # row is a dictionary that may or may not have a website_url and email field
@@ -56,12 +56,11 @@ def enrichWebsite(row, context):
     row["website_content"] = website_content
     if socials is not None:
         row['socials'] = socials
-    
-    
-    
-    # Await the summarizeWebsiteContent function to ensure it completes before proceeding
+
     try:
-        website_summary = summarizeWebsiteContent(website_content["home"], context[row['client_id']])
+        website_summary = summarizeWebsiteContent(website_content["home"], 
+                                                  context[row['client_id']]['summary'], 
+                                                  context[row['client_id']]['industry'])
         interestings = {}
         for key in website_content['internal']:
             if key != "home":
@@ -71,6 +70,10 @@ def enrichWebsite(row, context):
                 print(interesting)
                 if len(interesting.keys()) == 2:
                     interestings[interesting["interesting_thing"]] = interesting["summary"]
+        all_service_info = None
+        if website_content['services'] is not None:
+            all_service_info = inferServiceInfo(website_content['services'], context[row['client_id']]['industry'])
+        
     except:
         print(f"Summarization of {row['company']} failed")
         RuntimeError(f"Summarization of {row['company']} failed")
@@ -81,6 +84,7 @@ def enrichWebsite(row, context):
     row['icp'] = website_summary['icp']
     row['offer'] = website_summary['offer']
     row['interestings'] = interestings
-        
+    row['selling_points'] = all_service_info
+       
     return row
 

@@ -1,7 +1,6 @@
 import dotenv
 import ast
 from langchain.chat_models import ChatOpenAI
-from langchain.embeddings import OpenAIEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from langchain.schema.output_parser import StrOutputParser
@@ -48,10 +47,29 @@ def extractInterestingThing(content):
     chain = prompt | model | output_parser
     result = chain.invoke({"website_content": content})
     return result
-def summarizeWebsiteContent(content, context):
+
+def inferServiceInfo(content, product_context):
+    prompt_template = """
+    WEBSITE CONTENT:
+    ----------------
+    {website_content}
+    ----------------
+    This page contains data on the services, partnerships, and bussiness model of the company.
+    From this information understand the company needs in relation to {product_context}
+    Only output the response text.
+    RESPONSE:
+    """
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106")
+    output_parser = StrOutputParser()
+    chain = prompt | model | output_parser
+    result = chain.invoke({"website_content": content, "product_context": product_context})
+    return result
+
+def summarizeWebsiteContent(content, context, field_of_interest):
         
         formatString1 = str({
-        "summary": "targeted summary relevant to my product",
+        "summary": "targeted summary relevant to the services I offer",
         "icp": "Their ideal customer profile",
         "offer": "the services they are offering to the ICP"
         })
@@ -62,13 +80,13 @@ def summarizeWebsiteContent(content, context):
     
         Based on the information above provide me the following:
     
-        1. Give me a 150-word summary of the above website content. I will use this summary to personalise my cold outreach to employees of this company. Focus on the potential challenges and opportunities this company might face.
+        1. Give me a 150-word summary of the above website content. Focus on the potential challenges and opportunities this company might face in relation to {field}.
     
-        2. Give me a 20 word summary of the ideal customer profile that you infer from the website content. This ICP summary needs to start with either the word "Businesses" if the company is B2B or "Individuals" if the company is B2C. 
+        2. Give me a 30 word summary of the ideal customer profile that you infer from the website content. This ICP summary needs to start with either the word "Businesses" if the company is B2B or "Individuals" if the company is B2C. 
     
-        3. Give me a 20 word summary of their offer to their ICP and the services they provide them.
+        3. Give me a 30 word summary of their offer to their ICP and the services they provide them.
     
-        CONTEXT ABOUT MY PRODUCT:
+        CONTEXT ABOUT MY SERVICES:
     
         {product_context}
     
@@ -82,7 +100,7 @@ def summarizeWebsiteContent(content, context):
         output_parser = SimpleJsonOutputParser()
     
         chain = prompt1 | model | output_parser
-        input = {"website_content": content, "product_context": context, "format": formatString1}
+        input = {"website_content": content, "product_context": context, "format": formatString1, "field": field_of_interest}
         return tryThrice(chain, input)
 
 def tryThrice(chain, input):
@@ -94,44 +112,7 @@ def tryThrice(chain, input):
             break
     return result
 
-
-def generateSummaryOutput(profile_summary, website_summary):
-    prompt_template = """
-    PROFILE SUMMARY:
-    {profile_summary}
-
-    WEBSITE SUMMARY:
-    {website_summary}
-    Create a summary of a company profile by succinctly identifying key aspects of the company in 130 words. 
-    Begin with an overview of the company's purpose and clientele, 
-    then describe their objectives, customer ambitions, value proposition, and challenges. 
-    Detail the company's foundation, areas of expertise, and leadership roles, concluding with the geographical base. 
-    Each element is briefly articulated, aiming for clarity and brevity. 
-    The summary should encapsulate:
-
-    Company's mission and operations
-    Target customer demographic
-    Company and customer objectives
-    Unique offerings to clients
-    Identified challenges and pain points
-    Company's historical background
-    Specific areas of expertise
-    Leadership or key roles within the organization
-    Company's operational location
-
-    Only output your response in plain text.
-    RESPONSE:"""
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI()
-    output_parser = StrOutputParser()
-
-    chain = prompt | model | output_parser
-
-    resultText = chain.invoke({"profile_summary": profile_summary, "website_summary": website_summary})
-    resultVector = OpenAIEmbeddings().embed_query(resultText)
-    return {"totalSummaryText": resultText, "totalSummaryVector": resultVector}
-
-def extractRelevantNestedLinks(allLinks):
+def extractInterestingNestedLinks(allLinks):
     prompt_template = """
     INTERNAL LINKS:
     {internal_links}
@@ -139,15 +120,54 @@ def extractRelevantNestedLinks(allLinks):
     above is the set of all internal links found on the website. 
     I want to find the relevant information from the website to personalize a cold email.
     pick 3 of the above links that are most likely to contain the relevant information.
+    All picked links must be in english, else ignore them.
     Do not output the same link twice, move down the priority list.
     If http and https are both present, choose the http link.
+    Ignore things like cookies, privacy policy, terms and conditions, etc.)
     Prioritize links in the following order, one of each:
-    1. Something weird that stands out and not often found on other websites 
+    1. About us/our story 
     2. About Founder/CEO
-    3. About us/our story 
+    3. Something weird that stands out and not often found on other websites
     4. Mission statement
     5. Our team
     6. Testimonials
+    return the 3 links as a list of strings.
+    return only the list of strings.
+    your response can NOT contain duplicates.
+    RESPONSE:
+    """
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106")
+    output_parser = StrOutputParser()
+    chain = prompt | model | output_parser 
+    try:
+        result = ast.literal_eval(chain.invoke({"internal_links": allLinks}))
+    except:
+        result = []
+    return result
+
+
+def extractServiceNestedLinks(allLinks):
+    prompt_template = """
+    INTERNAL LINKS:
+    {internal_links}
+    -----
+    above is the set of all internal links found on the website. 
+    I want to find the relevant information in relation to the services I offer.
+    pick 4 of the above links that are most likely to contain the relevant information.
+    All picked links must be in english, else ignore them.
+    Do not output the same link twice, move down the priority list.
+    If http and https are both present, choose the http link.
+    Ignore things like cookies, privacy policy, terms and conditions, etc.)
+    Prioritize links in the following order, one of each:
+    1. About Us / Company Profile
+    2. Services or Products
+    3. Management Team / Leadership
+    4. Investor Relations / Financial Information
+    5. Careers / Jobs
+    6. Newsroom / Blog
+    7. Sustainability / Corporate Social Responsibility (CSR)
+    8. Partnerships and Alliances
     return the 3 links as a list of strings.
     return only the list of strings.
     your response can NOT contain duplicates.

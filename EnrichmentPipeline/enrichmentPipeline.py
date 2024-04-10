@@ -1,6 +1,6 @@
 from services_and_db.leads.LeadObjectConverter import *
 from EnrichmentPipeline.websiteEnrichment import *
-from EnrichmentPipeline.socialEnrichment import getLinkedInProxyCurl
+from EnrichmentPipeline.socialEnrichment import getLinkedInProxyCurl, verify_email
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from AI.summarize import summarizeProfileData
 import time
@@ -9,11 +9,49 @@ import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=20):
+def verifyEmailsForClient(client_id, progress_bar, status_text, batch_size=1):
+    leads = Leads.get_leads_by_client_id(client_id)
+    
+    leads = [lead for lead in leads if lead.get('email_verified', None) is None]
+    total_leads = len(leads)
+    for start_index in range(0, total_leads, batch_size):
+        end_index = min(start_index + batch_size, total_leads)
+        batch = leads[start_index:end_index]
+        time.sleep(1)
+        # Set up the ThreadPoolExecutor for the current batch
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            verify_email_for_batch(batch, executor)
+        update_progress(progress_bar, start_index, end_index, total_leads, status_text)
+
+def verify_email_for_batch(batch, executor):
+    future_to_row = {executor.submit(verify_email_for_row, row): row for row in batch}
+    for future in as_completed(future_to_row):
+        try:
+            enriched_row = future.result()
+        except:
+            print("Timeout enriching a row")
+            enriched_row = None
+        if enriched_row is not None:
+            print("Updating lead ", enriched_row['_id'])
+            Leads.updateLead(enriched_row)
+
+def verify_email_for_row(row):
+    verified = verify_email(row['email'])
+    if verified:
+        row['email_verified'] = True
+    else:
+        row['email_verified'] = False
+        row['ignore'] = True
+    return row
+
+def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=10):
     total_rows = len(rows)
     # Process rows in batches
     clients = Clients.get_all_clients()
-    context = {client['_id']: client['company_summary'] for client in clients}
+    context = {client['_id']: {
+        "summary": client['company_summary'],
+        "industry": client['company_industry'],
+     } for client in clients}
     for start_index in range(0, total_rows, batch_size):
         end_index = min(start_index + batch_size, total_rows)
         batch = rows[start_index:end_index]
@@ -68,7 +106,7 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
 
         # Set up the ThreadPoolExecutor for the current batch
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            singleBatchEmailCreationRun(batch, executor, chosen_campaign, client, perfect=perfect)
+            singleBatchEmailCreationRun(batch, executor, chosen_campaign, client)
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
 def fetch_and_update(profile):
@@ -77,7 +115,6 @@ def fetch_and_update(profile):
     print(url)
     if url:
         
-
         profile_info = getLinkedInProxyCurl(url)
         print(profile_info)
         profile['linkedInPage'] = profile_info

@@ -10,22 +10,32 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
 
         # Set up the ThreadPoolExecutor for the current batch
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            singleBatchEmailCreationRun(batch, executor, chosen_campaign, client, perfect=perfect)
+            singleBatchEmailCreationRun(batch, executor, chosen_campaign, client)
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
 def update_progress(progress_bar, start_index, end_index, total_leads, status_text):
     progress = end_index / total_leads
     progress_bar.progress(progress)
     status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_leads}")
-def singleBatchEmailCreationRun(batch, executor, template, client, perfect):
-    future_to_row = {executor.submit(writeEmailSequenceFromTemplate_DefaultPersonalization, row, template, client): row for row in batch}
+def singleBatchEmailCreationRun(batch, executor, template, client):
+    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template, client): row for row in batch}
     for future in as_completed(future_to_row):
         enriched_row = future.result()
         if enriched_row is not None:
             Leads.updateLead(enriched_row)
 
-def writeEmailSequenceFromTemplate(lead, template, client, perfect):
 
+def writeEmailSequenceFromTemplate(lead, template, client):
+    personalization_data = {"Interesting_bit_from_website": lead.get('interestings', "Nothing interesting found"),
+                            "linkedin": lead.get('linkedin_summary', "Not available"),
+                            "job_title": lead.get('job_title', "Not available"),
+                            "Company_information":{
+                                "offer": lead.get('offer', None),
+                                "industry": lead.get('industry', None),
+                                "icp": lead.get('icp', None),
+                                "company_summary": lead.get('website_summary', None),
+                                "relevant_to_my_offer": lead.get('selling_points', "Not available")
+                            }}
     client_context = client['company_summary']
     emails = template['emails']
     for i in range(len(emails)):
@@ -34,63 +44,26 @@ def writeEmailSequenceFromTemplate(lead, template, client, perfect):
     lead['campaign_id'] = template['_id']
     field_keys = set()  # Initialize an empty set to store unique field keys
     campaign_context = {}
-    if perfect:
-        try:
-            campaign_context['perfect'] = emailWriter.writeTheBestBrightBoundEmail(lead, client)
-        except:
-            RuntimeError(f"Error writing the best brightbound email for {lead['company']}")
-    email_template = emailWriter.emailTemplateWriterForLead(leadForEmailWriter(lead))
-    usedGPT4 = False
-    print("number of emails: ", len(emails))
     if len(emails) != 0:
-        try:
-            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
-            lead = extractFields(campaign_context, lead, field_keys, email_template)
-        except:
-            usedGPT4 = True
-            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
-            lead = extractFields(campaign_context, lead, field_keys, email_template)
-    else:
-        lead = extractFields(campaign_context, lead, field_keys, email_template)
-    fields = lead['email_fields']
-    error = False
-    for key in fields.keys():
-        if fields[key] == "" or fields[key] == None:
-            error = True
-
-    lead = confirm_email_structure(lead, template, client_context, emails, field_keys, email_template, usedGPT4, error)
-    return lead
-
-def writeEmailSequenceFromTemplate_DefaultPersonalization(lead, template, client):
-    personalization_data = {"website": lead.get('interestings', None),
-                            "linkedin": lead.get('linkedin_summary', None)}
-    print(personalization_data)
-    client_context = client['company_summary']
-    emails = template['emails']
-    for i in range(len(emails)):
-        emails[i]['number'] = i+1
-    emails = [email for email in emails if email['useAI']]
-    lead['campaign_id'] = template['_id']
-    field_keys = set()  # Initialize an empty set to store unique field keys
-    campaign_context = {}
-    personalization = emailWriter.writePersonalization(lead, client, personalization_data)
-    if len(emails) != 0:
-        try:
-            campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead), model ="gpt4") 
-            lead = extractFields(campaign_context, lead, field_keys,None)
-        except:
-            lead['to_be_fixed'] = True
+        tries = 0
+        while tries < 3:
+            try:
+                campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead, personalization_data)) 
+                lead = extractFields(campaign_context, lead, field_keys,None)
+                break
+            except:
+                tries += 1
+        if tries == 3:
+            lead['error'] = True
             return lead
-    else:
         lead = extractFields(campaign_context, lead, field_keys, None)
-    campaign_context['personalization'] = personalization
     fields = lead['email_fields']
-    error = False
+    print(fields)
     for key in fields.keys():
         if fields[key] == "" or fields[key] == None:
-            error = True
+            lead["error"] = [{"field": key, "valid": False, "message": "Field is empty"}]
+    
 
-    # lead = confirm_email_structure(lead, template, client_context, emails, field_keys, None, True, error)
     return lead
 
 

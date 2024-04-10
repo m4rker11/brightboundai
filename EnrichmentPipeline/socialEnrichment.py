@@ -1,20 +1,18 @@
-# from linkedin.getLinkedInInfo import getLinkedInProxyCurl
-# from services_and_db.leads.leadService import updateLead
 import asyncio
 from proxycurl.asyncio import Proxycurl
 from dotenv import load_dotenv
 import os
-
-            
-
+import requests
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Fetch the API key from environment variables
 api_key = os.getenv('PROXYCURL_API_KEY')
+abstract_api_key = os.getenv('ABSTRACT_API_KEY')
 proxycurl = Proxycurl(api_key=api_key, timeout=30)
 def getLinkedInProxyCurl(url):
+    print(api_key)
 
     profile_data = asyncio.run(proxycurl.linkedin.person.get(linkedin_profile_url=str(url)))
     return extract_profile_info(profile_data)
@@ -63,5 +61,7 @@ def extract_profile_info(data):
     print("magic")
     return result
 
-# # asyncio.run(fetch_and_update({'linkedIn_url': 'https://www.linkedin.com/in/markzarutin/'}))
-# print(getLinkedInProxyCurl("https://www.linkedin.com/in/markzarutin/"))
+def verify_email(email): 
+    response = requests.get("https://emailvalidation.abstractapi.com/v1/?api_key="+abstract_api_key+"&email="+email)
+    print(response.json())
+    return response.json()["deliverability"]=="DELIVERABLE"

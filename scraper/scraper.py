@@ -1,5 +1,5 @@
 from botasaurus import *
-from AI.summarize import extractRelevantNestedLinks
+from AI.summarize import extractInterestingNestedLinks, extractServiceNestedLinks
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from urllib.parse import urlparse, urljoin
 
@@ -34,15 +34,19 @@ def scrape_website(url, timeout=60):
 
         whole = extract_text_from_soup(innerHtml)
         returnObj["home"] = whole
-        print(internal_urls)
-        internal_urls = extractRelevantNestedLinks(internal_urls)
-        print(internal_urls)
-        if len(internal_urls)>1:
+        interesting_urls = extractInterestingNestedLinks(internal_urls)
+        service_urls = extractServiceNestedLinks(internal_urls)
+        if len(interesting_urls)>1:
             returnObj["internal"] = {}
-            for url in internal_urls:
-                # if url contains the base url redirect to the url else append the base url to the url
+            for url in interesting_urls:
                 driver.get(url=url)
                 returnObj["internal"][url] = extract_text_from_soup(driver.bs4())
+        
+        if len(service_urls)>1:
+            returnObj["services"] = {}
+            for url in service_urls:
+                driver.get(url=url)
+                returnObj["services"][url] = extract_text_from_soup(driver.bs4())
         return returnObj
     try:
         return scrape_website_task(url)

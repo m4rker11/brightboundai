@@ -1,67 +1,52 @@
-import dotenv
-import os
-import json
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.output_parsers.json import SimpleJsonOutputParser
-import langchain
-langchain.verbose = True
-from langchain_core.output_parsers import StrOutputParser
-dotenv.load_dotenv()
-# llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1, model_name="gpt-4-1106-preview")
+from AI.base import invoke_chain
+# def writePersonalization(lead, client, personalizationData):
+#     output_format = {
+#         "first_line": """The first line of the email should be a standalone sentence commenting on the most 
+#         interesting and personal part of the PD. 
+#         This should be describing the specific this information using specific language used in the PD.
+#         It should follow the following format: 
+#         "[Great/awesome/super cool/etc] reading about [10 words or less from the PD] on [personalization source]!""",
 
-def writePersonalization(lead, client, personalizationData):
-    output_format = {
-        "first_line": """The first line of the email should be a standalone sentence commenting on the most 
-        interesting and personal part of the PD. 
-        This should be describing the specific this information using specific language used in the PD.
-        It should follow the following format: 
-        "[Great/awesome/super cool/etc] reading about [10 words or less from the PD] on [personalization source]!""",
+#         "second_line": """The second line of email should be one sentence that comments on/follows up/elaborates pn/relates to the first line.
+#         It should dive deeper into the PD and mentioning more specifics from it.
+#         """,
 
-        "second_line": """The second line of email should be one sentence that comments on/follows up/elaborates pn/relates to the first line.
-        It should dive deeper into the PD and mentioning more specifics from it.
-        """,
+#         "third_line": """A 7-12 word praise specific to the first two lines, using the language from the PD. 
+#             Here are some examples: "A benevolent gesture from a simple yet effective approach", 
+#             "Sounds similar to a [ironic modifier to [company with similar story] e.g. a small company like Apple"]!",
+#             "Solving important problems, one person at a time, love it!"
+#             """,
 
-        "third_line": """A 7-12 word praise specific to the first two lines, using the language from the PD. 
-            Here are some examples: "A benevolent gesture from a simple yet effective approach", 
-            "Sounds similar to a [ironic modifier to [company with similar story] e.g. a small company like Apple"]!",
-            "Solving important problems, one person at a time, love it!"
-            """,
-
-        "Subject": """Based on the first and second line of the email, write the subject for the email in 5-8 words.  
-        Using the language from the PD, create a subject line that is personal and is elaborated on the first and second line of the email.""",  
-    }
+#         "Subject": """Based on the first and second line of the email, write the subject for the email in 5-8 words.  
+#         Using the language from the PD, create a subject line that is personal and is elaborated on the first and second line of the email.""",  
+#     }
 
 
-    prompt_template = """
-    Personalization Data:
+#     prompt_template = """
+#     Personalization Data:
 
-    {personalizationData}
-    --------
-    You are a careful, creative, and thoughtful Sales Development Representative at {myCompany}.
-    You are writing a personalization for an email to {lead_name} from {lead_company} using personalization data further referred to as PD. Here are the rules you have to follow.
-    Rules:
-    1. The output should be a json object with the following format:
-    {output_format}
-    2. The output should be kind, thoughtful, and personal, while keeping the language found in the values, not keys, of the PD or simpler.
-    3. Use only one field's value from the PD in the personalization, unless they cover the same topic, don't mention the key names of the field.
-    4. Some of the data might be site specific like cookies, privacy policy, cloudflare, etc. Do not use this data in the personalization, don't use quotations within the answer sentences.
-    5. Channel the same energy as you infer from the PD field you are referring to, meaning if the message is humorous, be humorous, if it is inspiring, be inspired, etc.
-    6. Only output the json object.
-    RESPONSE:
-    """
-    #print a populated prompt
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-4-turbo-preview", temperature=0.6)
-    output_parser = SimpleJsonOutputParser()
-    chain = prompt | model | output_parser
-    return chain.invoke({"personalizationData": personalizationData,
-                            "lead_name": lead.get('first_name', ""),
-                            "lead_company": lead.get('company', ""),
-                            "myCompany": client.get('company_name', ""),
-                            "output_format": output_format})
-
-
+#     {personalizationData}
+#     --------
+#     You are a careful, creative, and thoughtful Sales Development Representative at {myCompany}.
+#     You are writing a personalization for an email to {lead_name} from {lead_company} using personalization data further referred to as PD. Here are the rules you have to follow.
+#     Rules:
+#     1. The output should be a json object with the following format:
+#     {output_format}
+#     2. The output should be kind, thoughtful, and personal, while keeping the language found in the values, not keys, of the PD or simpler.
+#     3. Use only one field's value from the PD in the personalization, unless they cover the same topic, don't mention the key names of the field.
+#     4. Some of the data might be site specific like cookies, privacy policy, cloudflare, etc. Do not use this data in the personalization, don't use quotations within the answer sentences.
+#     5. Channel the same energy as you infer from the PD field you are referring to, meaning if the message is humorous, be humorous, if it is inspiring, be inspired, etc.
+#     6. Only output the json object.
+#     RESPONSE:
+#     """
+#     #print a populated prompt
+#     return invoke_chain(model="sonnet", temperature=0.2, 
+#                         prompt_template=prompt_template, output_parser="json", 
+#                         data = {"personalizationData": personalizationData,
+#                             "lead_name": lead.get('first_name', ""),
+#                             "lead_company": lead.get('company', ""),
+#                             "myCompany": client.get('company_name', ""),
+#                             "output_format": output_format})
 
 def writeTheBestBrightBoundEmail(lead, client, outputFormat = None, base_format = None):
     
@@ -117,45 +102,23 @@ def writeTheBestBrightBoundEmail(lead, client, outputFormat = None, base_format 
     Rule 6: Return only the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
     
     RESPONSE:"""
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-4-turbo-preview", temperature=0.2)
-    output_parser = SimpleJsonOutputParser()
 
-    chain = prompt | model | output_parser
-    return chain.invoke({  
-        "product_context": client['company_summary'],
-        "myCompany": client['company_name'],
-        "company": lead['company'],
-        "name": lead['first_name'],
-        "linkedin_summary": lead['linkedin_summary'],
-        "emailBaseFormat": emailBaseFormat,
-        "output_format": outputFormat,
-        "company_summary": {"summary": lead['website_summary'], "icp": lead['icp'], "offer": lead['offer']}
+    return invoke_chain(model="sonnet", temperature=0.2,
+                        prompt_template=prompt_template, output_parser="json",
+                        data = {  "product_context": client['company_summary'],
+                        "myCompany": client['company_name'],
+                        "company": lead['company'],
+                        "name": lead['first_name'],
+                        "linkedin_summary": lead['linkedin_summary'],
+                        "emailBaseFormat": emailBaseFormat,
+                        "output_format": outputFormat,
+                        "company_summary": {
+                            "summary": lead['website_summary'], 
+                            "icp": lead['icp'], 
+                            "offer": lead['offer']}
     })
 
-def emailTemplateWriterForLead(lead):
-    email = """
-    Subject: Celebrating Your Success and Learning from Others
-
-    Hi {{Your past client's first name}},
-
-    Time flies! It’s been {{months since last purchase}} months since you started using {companyName}'s services. 
-    I hope it's been great for {{your past client's company name}}.
-
-    I wanted to share a quick story. One of our clients, {{another client’s company}}, was in a similar spot as you. 
-    With our help, they managed to {{key achievement you helped them with}}. I think there’s a chance for {{your past client's company name}} to have the same success.
-
-    What do you think about a quick call to talk about it and see how we can help you even more?
-
-    Cheers,
-    {firstName}
-
-    """
-    return email.format(companyName=lead['company'], firstName=lead['first_name'])
-
-
-
-def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_context, lead, model = "gpt4") -> dict:
+def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_context, lead) -> dict:
     prompt_template ="""
     EMAIL TEMPLATES:
     '''
@@ -177,9 +140,8 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_co
     4. The emails are written with the goal of bringing the lead in for a conversation with the client, the description of the client is in the client context.
     5. When the values are plugged in to the email templates, the resulting emails should be coherent and sound human.
     6. Output only the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
-    7. Ignore and disregard fields called "accountSignature" and "emailTemplate". They should not be present in the output.
-    8. If a field has a word count limit, do not exceed the limit.
-    9. The output json format should be the following:
+    7. If a field has a word count limit, do not exceed the limit.
+    8. The output json format should be the following:
     {{emails: [
         {{1: {{
             "subject": "subject of email 1",
@@ -193,13 +155,9 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_co
     
     OUTPUT:
     """
-    model_name = "gpt-4-turbo-preview" if model == "gpt4" else "gpt-3.5-turbo-1106"
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name=model_name, temperature=0.1)
-    output_parser = SimpleJsonOutputParser()
-
-    chain = prompt | model | output_parser
-    return chain.invoke({"email_templates": email_templates,
+    return invoke_chain(model="gpt-4", temperature=0.2,
+                        prompt_template=prompt_template, output_parser="json",
+                        data = {"email_templates": email_templates,
                             "lead_info": lead,
                             "client_context": client_context,
                             "lead_name": lead['first_name'],
@@ -238,12 +196,9 @@ def validateEmailsForLead(lead, campaign, client_context)->dict:
 
     OUTPUT:
     """
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    model = ChatOpenAI(model_name="gpt-3.5-turbo-1106", temperature=0.1)
-    output_parser = SimpleJsonOutputParser()
-
-    chain = prompt | model | output_parser
-    return chain.invoke({"emails": campaign,
+    return invoke_chain(model="gpt-3.5", temperature=0.2,
+                        prompt_template=prompt_template, output_parser="json",
+                        data = {"emails": campaign,
                             "lead_info": lead,
                             "client_context": client_context,
                             "lead_name": lead['first_name'],
