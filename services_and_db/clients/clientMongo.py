@@ -31,13 +31,6 @@ def get_client_by_name(name):
     client = collection.find_one({"company_name": name})
     return client
 
-def get_client_by_id(id):
-    """
-    Gets a client by id
-    """
-    client = collection.find_one({"_id": ObjectId(id)})
-    return client
-
 def create_client(client):
     """
     Creates a client

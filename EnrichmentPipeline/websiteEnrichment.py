@@ -18,21 +18,6 @@ def chooseBestUrl(row):
         return website_url
     else:
         return max([website_url, emailDomain], key=lambda x: compute_similarity(x, company_name))
-    
-def isBtoB(icp):
-    ICP_keywords = [
-    "business", "industry", "enterprise", 
-    "corporate", "decision-makers", "procurement", 
-    "stakeholders", "partnerships", "operations", 
-    "solutions", "supply chain", "integration", 
-    "volume", "commercial", "wholesale",
-    ]
-    lowercased_icp = icp.lower()
-    #check if the icp contains any of the keywords
-    for keyword in ICP_keywords:
-        if keyword in lowercased_icp:
-            return True
-    return False
 
 def compute_similarity(input_string, reference_string):
         diff = difflib.ndiff(input_string, reference_string)

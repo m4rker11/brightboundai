@@ -1,10 +1,9 @@
 from botasaurus import *
 from AI.summarize import extractInterestingNestedLinks, extractServiceNestedLinks
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from urllib.parse import urlparse, urljoin
 
-def scrape_website(url, timeout=60):
-    @browser(cache=False, parallel=20, reuse_driver=True, data=[url], close_on_crash=True)
+def scrape_website(url):
+    @browser(cache=False, parallel=20, reuse_driver=True, data=[url], close_on_crash=True, headless=True)
     def scrape_website_task(driver: AntiDetectDriver, data):
         url = validate_url(data)
         returnObj = {}

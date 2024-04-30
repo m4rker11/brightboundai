@@ -1,4 +1,3 @@
-import csv
 import services_and_db.leads.LeadMongo as Leads
 def addLead(lead)->bool:
     """
@@ -19,7 +18,7 @@ def addLeadsFromDataFrame(df)->bool:
     """
     Adds leads from a dataframe
     """
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         lead = row.to_dict()
         if not addLead(lead):
             print("Failed to add lead")
@@ -28,12 +27,6 @@ def addLeadsFromDataFrame(df)->bool:
 
 def updateLead(lead)->bool:
     return Leads.update_lead(lead['_id'], lead)
-
-def update_field_in_lead_by_id(id, field, value):
-    lead = Leads.get_lead_by_id(id)
-    lead[field] = value
-    print(lead)
-    return Leads.update_lead(id, lead)
 
 def get_unenriched_leads():
     return Leads.get_unenriched_leads()

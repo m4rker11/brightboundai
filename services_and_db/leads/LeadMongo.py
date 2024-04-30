@@ -6,7 +6,6 @@ import requests
 # get connetion string from .env file
 load_dotenv()
 connection_string = os.getenv("MONGO_CONNECTION_STRING")
-api_key = os.getenv("ABSTRACT_API_KEY")
 # Connect to MongoDB
 client = MongoClient(connection_string)
 db = client['brightbound']
@@ -20,6 +19,12 @@ lead_schema = {
     'company': str,
     'website_url': str,
     'linkedIn_url': str,
+    'company_linkedin': str,
+    'company_twitter': str,
+    'company_facebook': str,
+    'funding_info': str,
+    'company_info': str,
+    'linkedin_data': dict,
     'email': str,
     'icp': str,
     'offer': str,
@@ -31,7 +36,6 @@ lead_schema = {
     'company_state': str,
     'company_linkedin_url': str,
     'employees': int,
-    'offer_specific': bool,
     'website_summary': str,
     'website_content': dict,
     'linkedin_summary': str,
@@ -50,10 +54,6 @@ lead_schema = {
     'group': str,
 }
 
-def validate_email(lead):
-    url = "https://emailvalidation.abstractapi.com/v1/?api_key={api_key}&email={email}".format(api_key=api_key, email=lead['email'])
-    response = requests.get(url)
-    return response.json()['deliverability'] == "DELIVERABLE"
 
 def validate_lead(lead):
     if not isinstance(lead, dict):
@@ -78,11 +78,6 @@ def validate_lead(lead):
     return True  # If all checks pass, the lead is valid
 
 
-# now we need some retrieval functions
-# get all leads
-def get_all_leads():
-    return list(collection.find())
-# get all contacted leads of a certain status
 
 def add_lead(lead):
     if not validate_lead(lead):
@@ -108,10 +103,11 @@ def get_unenriched_leads() -> list:
 
 def get_leads_for_linkedin_enrichment() -> list:
     return list(collection.find({"linkedin_summary": {"$exists": False},
+                                 "linkedin_data": {"$exists": True},
                             "ignore": {"$ne": True}}))
 
 def get_leads_by_client_id(client_id):
-    return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}}))
+    return list(collection.find({"client_id": ObjectId(client_id), "campaign_id": {"$eq":None}, "ignore": {"$ne": True}}))
 
 def get_fully_enriched_leads_by_client_id(client_id):
     return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}, "linkedin_summary": {"$exists": True}, "website_summary": {"$exists": True}}))
