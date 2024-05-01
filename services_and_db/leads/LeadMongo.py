@@ -106,6 +106,12 @@ def get_leads_for_linkedin_enrichment() -> list:
                                  "linkedin_data": {"$exists": True},
                             "ignore": {"$ne": True}}))
 
+def get_leads_for_website_or_linkedin_enrichment() -> list:
+    return list(collection.find({"$or": [{"website_summary": {"$exists": False}}, {"linkedin_summary": {"$exists": False},
+                                 "linkedin_data": {"$exists": True}}],
+                            "ignore": {"$ne": True}}))
+
+
 def get_leads_by_client_id(client_id):
     return list(collection.find({"client_id": ObjectId(client_id), "campaign_id": {"$eq":None}, "ignore": {"$ne": True}}))
 

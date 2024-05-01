@@ -29,7 +29,7 @@ def updateLead(lead)->bool:
     return Leads.update_lead(lead['_id'], lead)
 
 def get_unenriched_leads():
-    return Leads.get_unenriched_leads()
+    return Leads.get_leads_for_website_or_linkedin_enrichment()
 
 def get_leads_for_linkedin_enrichment():
     return Leads.get_leads_for_linkedin_enrichment()

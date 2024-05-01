@@ -10,7 +10,7 @@ from EnrichmentPipeline.emailEnrichment import singleBatchEmailCreationRun
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
 
-def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=10):
+def batchEnrichList(rows, batch_size=10):
     total_rows = len(rows)
     # Process rows in batches
     clients = Clients.get_all_clients()
@@ -25,9 +25,6 @@ def batchEnrichListWithWebsite(rows, progress_bar, status_text, batch_size=10):
         # Set up the ThreadPoolExecutor for the current batch
         with ThreadPoolExecutor(max_workers=batch_size,) as executor:
             singleBatchEnrichmentRun(batch, executor, context)
-        progress = end_index / total_rows
-        progress_bar.progress(progress)
-        status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_rows}")
         
 def update_progress(progress_bar, start_index, end_index, total_leads, status_text):
     progress = end_index / total_leads
@@ -47,13 +44,15 @@ def singleBatchEnrichmentRun(batch, executor, context):
             print("Updating lead ", enriched_row['_id'])
             Leads.updateLead(enriched_row)
 
-def enrichMongoDB(progress_bar, status_text):
+def enrichMongoDB():
     unenriched_leads = Leads.get_unenriched_leads()
-    batchEnrichListWithWebsite(unenriched_leads, progress_bar, status_text)
+    batchEnrichList(unenriched_leads)
 
 
 def enrichRow(row, context):   
     try:
+        if row.get('linkedin_data', None) is not None:
+            row['linkedin_summary'] = summarizeProfileData(clean_empty(row['linkedin_data']))
         row = enrichWebsite(row, context)
     except:
         return stoopifyLead(row)
@@ -76,14 +75,9 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
 
-def async_upload_leads(data=None, client_name=None, group=None, client_id=None, streamlit=None):
-    #upload leads with a single thread and alert when completed
+def async_upload_leads(data=None, client_name=None, group=None, client_id=None):
     with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(upload_leads, data, client_name, group, client_id)
-        while not future.done():
-            time.sleep(1)
-        if streamlit:
-            streamlit.toast("Leads uploaded successfully")
+        executor.submit(upload_leads, data, client_name, group, client_id)
 
 
 def upload_leads(data=None, client_name=None, group=None, client_id=None):
@@ -91,9 +85,9 @@ def upload_leads(data=None, client_name=None, group=None, client_id=None):
         data = get_contacts_from_client_name_and_group_name(client_name, group)
         data['client_id'] = client_id
         data['group'] = group
-        
     data = map_data_to_schema(data)
     Leads.addLeadsFromDataFrame(data)
+    enrichMongoDB()
 
 
 
@@ -155,5 +149,17 @@ def map_data_to_schema(data):
     # Drop phone numbers and personal email
     data = data.drop(columns=[col for col in data.columns if 'phone' in col or col == 'personal_email1'], errors='ignore')
     data = remove_unwanted_columns(data)
+    data['linkedin_data'] = clean_empty(data['linkedin_data'])
     
     return data
+
+def clean_empty(d):
+    if isinstance(d, dict):
+        return {
+            k: v 
+            for k, v in ((k, clean_empty(v)) for k, v in d.items())
+            if v
+        }
+    if isinstance(d, list):
+        return [v for v in map(clean_empty, d) if v]
+    return d

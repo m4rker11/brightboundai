@@ -49,14 +49,14 @@ def writeEmailSequenceFromTemplate(lead, template, client):
         while tries < 3:
             try:
                 campaign_context = emailWriter.writeEmailFieldsFromCampaignAndLeadInfoFromFormat(emails, client_context, leadForEmailWriter(lead, personalization_data)) 
-                lead = extractFields(campaign_context, lead, field_keys,None)
+                lead = extractFields(campaign_context, lead, field_keys)
                 break
             except:
                 tries += 1
         if tries == 3:
             lead['error'] = True
             return lead
-        lead = extractFields(campaign_context, lead, field_keys, None)
+        lead = extractFields(campaign_context, lead, field_keys)
     fields = lead['email_fields']
     print(fields)
     for key in fields.keys():
@@ -67,7 +67,7 @@ def writeEmailSequenceFromTemplate(lead, template, client):
     return lead
 
 
-def extractFields(campaign_context, lead, field_keys, email_template):
+def extractFields(campaign_context, lead, field_keys):
     email_fields = {}
     if campaign_context.get("emails", None) is not None:
         for email_dict in campaign_context["emails"]:

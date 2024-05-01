@@ -18,8 +18,7 @@ def summarizeProfileData(profile):
     In addition to the summary, provide interesting personal details or observations that can be used to personalize a cold email.
     These details can be about a post they made, article they wrote, personal story, drastic career change, polarizing opinion, or something else unique or relatable. 
     add an additional field "interestings" with a list of 3 interesting items which highlight 3 details from the above.
-    Your output should be a json with one field: "profile summary" and "interestings".
-    CONCISE SUMMARY JSON:"""
+    RESPONSE:"""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     model = ChatOpenAI(model="gpt-3.5-turbo-1106")
     output_parser = StrOutputParser()

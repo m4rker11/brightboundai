@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import bson
 from services_and_db.leads.LeadObjectConverter import *
-from EnrichmentPipeline.enrichmentPipeline import enrichMongoDB, createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads
+from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
@@ -64,14 +64,6 @@ def leads_page():
     #         status_text.text("Initializing Linkedin enrichment process...")
     #         profiles = Leads.get_leads_for_linkedin_enrichment()
     #         fetch_and_update_profiles(profiles, progress_bar, status_text)
-
-def enrich_leads_with_website_info(data):
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    status_text.text("Starting Website Enrichment...")
-    # Placeholder for enrichment logic
-    enrichMongoDB(progress_bar, status_text)  # This function needs to be defined based on actual logic
-    status_text.text("Enrichment Completed!")
 
 
 def client_management_page():
@@ -276,25 +268,6 @@ def email_generation_page():
     if st.button("Get by group"):
         leads = [lead for lead in leads if lead.get('group', '') == group]
         st.session_state.leads = leads
-    # linkedInEnriched = st.selectbox("Select Leads with Linkedin Enrichment", [True, False, "Both"])
-    # if linkedInEnriched=="Both":
-    #     print("nice")
-    # elif linkedInEnriched:
-    #     leads = [lead for lead in leads if 'linkedInSummary' in lead]
-    # else:
-    #     leads = [lead for lead in leads if 'linkedInSummary' not in lead]
-    
-
-    # # get total number of leads without campaign_id
-    # leads_without_campaign = [lead for lead in leads if 'campaign_id' not in lead]
-    # count = len(leads_without_campaign)
-    # # how many leads to generate emails for
-    # recipient_count = st.number_input("Enter Recipient Count out of : " + str(count), value=1)
-    # if recipient_count<count:
-    #     #do a random sample of leads
-    #     leads = random.sample(leads_without_campaign, recipient_count)
-    # else:
-    #     leads = leads_without_campaign
     if st.button("Generate Emails"):
         progress_bar = st.progress(0)
         status_text = st.empty()
