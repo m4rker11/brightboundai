@@ -1,7 +1,6 @@
 from scraper.scraper import scrape_website
-from services_and_db.leads.leadService import get_unenriched_leads, updateLead
 import difflib
-from AI.summarize import summarizeWebsiteContent, extractInterestingThing, inferServiceInfo
+from AI.summarize import summarizeWebsiteHomepage, summarizeWebsitePersonal, summarizeWebsiteTeam, summarizeWebsiteServices, summarizeBlog
 
 def chooseBestUrl(row):
     # row is a dictionary that may or may not have a website_url and email field
@@ -42,34 +41,33 @@ def enrichWebsite(row, context):
     if socials is not None:
         row['socials'] = socials
 
-    try:
-        website_summary = summarizeWebsiteContent(website_content["home"], 
-                                                  context[row['client_id']]['summary'], 
-                                                  context[row['client_id']]['industry'])
-        interestings = {}
-        for key in website_content['internal']:
-            if key != "home":
-                print(f"Summarizing {key}")
-                item = website_content['internal'][key]
-                interesting = extractInterestingThing(str(item))
-                print(interesting)
-                if len(interesting.keys()) == 2:
-                    interestings[interesting["interesting_thing"]] = interesting["summary"]
-        all_service_info = None
-        if website_content['services'] is not None:
-            all_service_info = inferServiceInfo(website_content['services'], context[row['client_id']]['industry'])
-        
-    except:
-        print(f"Summarization of {row['company']} failed")
-        RuntimeError(f"Summarization of {row['company']} failed")
-    if website_summary is None:
-        print(f"Website summary of {row['company']} is none")
-        RuntimeError(f"Website summary of {row['company']} is none")
-    row['website_summary'] = website_summary['summary']
-    row['icp'] = website_summary['icp']
-    row['offer'] = website_summary['offer']
-    row['interestings'] = interestings
-    row['selling_points'] = all_service_info
-       
+    parts = get_website_content(website_content)
+    #summarize home page: 
+    if len(str(parts['homepage']))>10:
+        website_summary = summarizeWebsiteHomepage(parts['homepage'], context[row['client_id']]['summary'], context[row['client_id']]['industry'])
+        row['website_summary']['summary'] = website_summary['summary']
+        row['website_summary']['icp'] = website_summary['icp']
+        row['website_summary']['offer'] = website_summary['offer']
+    if len(str(parts['personal']))>10:
+        personal_summary = summarizeWebsitePersonal(parts['personal'], row['company'])
+        row['website_summary']['personal'] = personal_summary
+    if len(str(parts['team']))>10:
+        team_summary = summarizeWebsiteTeam(parts['team'], row['company'])
+        row['website_summary']['team'] = team_summary
+    if len(str(parts['services']))>10:
+        services_summary = summarizeWebsiteServices(parts['services'], row['company'])
+        row['website_summary']['services'] = services_summary
+    if len(str(parts['blog']))>10:
+        blog = summarizeBlog(parts['blog'],row['company'])
+        row['website_summary']['blog'] = blog
     return row
 
+def get_website_content(website_content):
+    structure = {
+        "homepage": website_content.get('home', None),
+        "personal": [website_content['internal'].get('about_us', None), website_content['internal'].get('founder_story', None), website_content['internal'].get('mission', None), website_content['internal'].get('sustainability', None)],
+        "team": [website_content['internal'].get('team', None), website_content['internal'].get('leadership', None), website_content['internal'].get('partnerships', None)],
+        "services": [website_content['internal'].get('testimonials', None), website_content['internal'].get('services', None)],
+        "blog": website_content['internal'].get('blog', None)
+    }
+    return structure

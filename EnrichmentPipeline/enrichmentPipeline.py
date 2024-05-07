@@ -6,6 +6,8 @@ from EnrichmentPipeline.websiteEnrichment import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from AI.summarize import summarizeProfileData
 import time
+import json
+from Providers.Instantly.instantly import lead_ok
 from EnrichmentPipeline.emailEnrichment import singleBatchEmailCreationRun
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
@@ -80,13 +82,14 @@ def async_upload_leads(data=None, client_name=None, group=None, client_id=None):
         executor.submit(upload_leads, data, client_name, group, client_id)
 
 
-def upload_leads(data=None, client_name=None, group=None, client_id=None):
+def upload_leads(data=None, client_name=None, group=None, client_id=None, list_id=None):
     if data is None and client_name is not None and group is not None and client_id is not None:
-        data = get_contacts_from_client_name_and_group_name(client_name, group)
+        data = get_contacts_from_client_name_and_group_name(list_id)
         data['client_id'] = client_id
         data['group'] = group
     data = map_data_to_schema(data)
     Leads.addLeadsFromDataFrame(data)
+    verify_risky_leads_with_instantly()
     enrichMongoDB()
 
 
@@ -163,3 +166,24 @@ def clean_empty(d):
     if isinstance(d, list):
         return [v for v in map(clean_empty, d) if v]
     return d
+
+
+def verify_risky_leads_with_instantly():
+    # get all leads that don't have risky parameter set:
+    leads = Leads.get_leads_without_risk()
+    counter = 0
+    good_counter = 0
+    for lead in leads:
+        time.sleep(0.11)
+        email = lead['email']
+        # print(lead)
+        if lead_ok(email):
+            lead['risk'] = False
+            good_counter += 1
+            print(f"Lead {email} is not risky. {good_counter} leads are good so far.")
+        else:
+            counter += 1
+            lead['risk'] = True
+            lead['ignore'] = True
+            print(f"Lead {email} is risky, ignoring it. {counter} leads ignored so far.")
+        Leads.updateLead(lead)

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 # get connetion string from .env file
 load_dotenv()
-connection_string = os.getenv("MONGO_CONNECTION_STRING")
+connection_string = os.environ["MONGO_CONNECTION_STRING"]
 # Connect to MongoDB
 client = MongoClient(connection_string)
 db = client['brightbound']

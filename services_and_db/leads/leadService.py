@@ -48,3 +48,6 @@ def get_leads_by_batch_id(batch_id):
 
 def check_if_lead_exists(email, website, client_id)->bool:
     return Leads.check_if_lead_exists(email, website, client_id)
+
+def get_leads_without_risk():
+    return Leads.get_leads_without_risk()

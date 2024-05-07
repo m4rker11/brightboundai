@@ -5,7 +5,7 @@ import os
 import requests
 # get connetion string from .env file
 load_dotenv()
-connection_string = os.getenv("MONGO_CONNECTION_STRING")
+connection_string = os.environ["MONGO_CONNECTION_STRING"]
 # Connect to MongoDB
 client = MongoClient(connection_string)
 db = client['brightbound']
@@ -52,6 +52,8 @@ lead_schema = {
     'client_id': ObjectId,
     'batch_id': ObjectId,
     'group': str,
+    'error': bool,
+    'risk': bool,
 }
 
 
@@ -127,3 +129,6 @@ def get_leads_by_campaign_id(campaign_id):
 def check_if_lead_exists(email, website, client_Id) -> bool:
     #check if lead with email or website exists by client id returns true if exists
     return collection.find_one({"$or": [{"email": email}, {"website_url": website}], "client_id": ObjectId(client_Id)}) != None
+
+def get_leads_without_risk():
+    return list(collection.find({"risk": {"$exists": False}, "ignore": {"$ne": True}}))

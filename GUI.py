@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import bson
 from services_and_db.leads.LeadObjectConverter import *
-from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads
+from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads, verify_risky_leads_with_instantly
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
@@ -11,7 +11,7 @@ import services_and_db.campaigns.campaignMongo as Campaigns
 # Streamlit UI
 def main():
     # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management", "Perfect First Email"])
+    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management"])
 
     if page == "Leads":
         leads_page()
@@ -48,22 +48,11 @@ def leads_page():
                     data['group'] = group
                     async_upload_leads(data=data, streamlit=st)
         elif choice == "Direct From Wiza":
-            if st.button("Get Leads from Wiza"):
+            list_id = st.text_input("Enter Wiza List ID", value=None)
+            if list_id and st.button("Get Leads from Wiza"):
                 client_id = Clients.get_client_by_name(client_name)['_id']
                 upload_leads(client_name=client_name, group=group, client_id=client_id)
-           
-    #         Leads.addLeadsFromDataFrame(st.session_state.data)
-    #         st.success("Leads added to client!")
 
-    #     if st.button("Start Website Enrichment"):
-    #         enrich_leads_with_website_info(st.session_state.data)
-
-    #     if st.button("Enrich ALL Leads linkedIn"):
-    #         progress_bar = st.progress(0)
-    #         status_text = st.empty()
-    #         status_text.text("Initializing Linkedin enrichment process...")
-    #         profiles = Leads.get_leads_for_linkedin_enrichment()
-    #         fetch_and_update_profiles(profiles, progress_bar, status_text)
 
 
 def client_management_page():
@@ -71,10 +60,16 @@ def client_management_page():
 
     # Retrieve all clients from the database
     client_list = Clients.get_all_clients()
-    client_names = ["New Client"] + [client['name'] for client in client_list]  # Add option for adding a new client
+    client_names = ["New Client"] + [client['company_name'] for client in client_list]  # Add option for adding a new client
 
-    selected_client_name = st.selectbox("Select Client or Add New", client_names)
-    selected_client = None
+    # with form
+    with st.form(key='client_form'):
+        selected_client_name = st.selectbox("Select Client or Add New", client_names)
+        submit_button = st.form_submit_button(label='Submit')
+        if submit_button and selected_client_name != "New Client":
+            selected_client = Clients.get_client_by_name(selected_client_name)
+        else:
+            selected_client = None
 
     # Show fields for update/create with information preloaded if updating
     st.subheader("Client Information")
@@ -127,8 +122,12 @@ def campaign_page():
     campaigns = Campaigns.get_campaigns_by_client_id(client['_id'])
     campaign_names_and_ids = [(campaign['name'], campaign['_id']) for campaign in campaigns]
     if campaign_names_and_ids != []:
-        chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names_and_ids, format_func=lambda x: x[0])[0]
-        campaign_id = [campaign[1] for campaign in campaign_names_and_ids if campaign[0] == chosen_campaign_name][0]
+        with st.form(key='campaign_form'):
+            chosen_campaign_name = st.selectbox("Select Campaign: ", campaign_names_and_ids, format_func=lambda x: x[0])[0]   
+            if st.form_submit_button(label='Submit'):
+                campaign_id = [campaign[1] for campaign in campaign_names_and_ids if campaign[0] == chosen_campaign_name][0]
+                st.session_state['campaign_id'] = campaign_id
+                st.session_state['campaign'] = Campaigns.get_campaign_by_id(campaign_id)
     # Add Campaign Button
     if st.button("Add Campaign"):
         st.session_state['add_campaign_clicked'] = True
@@ -142,19 +141,18 @@ def campaign_page():
             chosen_campaign_name = new_campaign_name
             st.success("Campaign added!")
             st.session_state['add_campaign_clicked'] = False  # Reset the state
-
-    # Confirm Selection Button
-    if st.button("Confirm Selections"):
-        campaign = Campaigns.get_campaign_by_id(campaign_id)
-        st.session_state['campaign'] = campaign
+            st.session_state['campaign_id'] = campaign_id
+            st.session_state['campaign'] = Campaigns.get_campaign_by_id(campaign_id)
+            st.session_state['emails'] = Campaigns.get_campaign_by_id(campaign_id).get('emails', [])
+            st.rerun()  # Rerun the script to display the new campaign
 
     try: 
         if 'campaign' in st.session_state:
-            recipient_count = st.number_input("Enter Recipient Count:", value=500, min_value=1)
-            email_count = st.number_input("How many emails should be in the campaign?", min_value=1, max_value=10, value=5)
-
+            email_count = st.number_input("How many emails should be in the campaign?", min_value=1, max_value=10, value=len(st.session_state['campaign'].get('emails',[1])))
             # Initialize or adjust the size of session_state.emails
-            if 'emails' not in st.session_state:
+            if 'emails' in st.session_state['campaign']:
+                st.session_state.emails = st.session_state['campaign']['emails']
+            elif 'emails' not in st.session_state:
                 st.session_state.emails = [{'main_template': ''} for _ in range(email_count)]
             elif len(st.session_state.emails) != email_count:
                 st.session_state.emails = st.session_state.emails[:email_count] + [{'main_template': ''} for _ in range(email_count - len(st.session_state.emails))]
@@ -165,12 +163,17 @@ def campaign_page():
                     st.write(f"Email {i+1}")
                     email_key = f"email_template_{i}"  # Unique key for each email template
                     email_subject_key = f"email_subject_{i}"
-                    st.session_state.emails[i]['subject'] = st.text_input("Enter Email Subject:", value=st.session_state.emails[i].get('subject', ''), key = email_subject_key)
-                    st.session_state.emails[i]['main_template'] = st.text_area("Please write the email template here:", value=st.session_state.emails[i]['main_template'], key=email_key)
+                    if i < len(st.session_state.emails):
+                        subject = st.session_state.emails[i].get('subject', '')
+                        body = st.session_state.emails[i].get('body', '')
+                    else:
+                        st.session_state.emails.append({'subject': '', 'main_template': ''})
+                    st.session_state.emails[i]['subject'] = st.text_input("Enter Email Subject:", value=subject, key = email_subject_key)
+                    st.session_state.emails[i]['main_template'] = st.text_area("Please write the email template here:", value=body, key=email_key)
             # Confirm Templates Button
             if st.button("Confirm Email Templates"):
                 for i, email in enumerate(st.session_state.emails):
-                    main_template = email['subject']+'/n/n/n/n'+email['main_template']
+                    main_template = email.get('subject', '')+'/n/n/n/n'+email.get('main_template', '')
                     input_fields = {}
                     while "{{" in main_template:
                         start = main_template.find("{{")
@@ -188,7 +191,12 @@ def campaign_page():
                 if 'input_fields' in email:
                     for input_field in email['input_fields']:
                         unique_input_fields.add(input_field)
-
+            existing_input_fields = {}
+            if 'emails' in st.session_state:
+                for email in st.session_state['emails']:
+                    if 'fields' in email:
+                        for field in email['fields']:
+                            existing_input_fields[field] = email['fields'][field]
             # Second pass: Display the fields
             for input_field in unique_input_fields:
                 with st.container():
@@ -196,7 +204,7 @@ def campaign_page():
 
                     # Create a single input field for the unique input field
                     input_field_key = f"unique_{input_field}"  # Unique key for each unique input field
-                    input_value = st.text_input(f"Detailed description of {input_field}", key=input_field_key)
+                    input_value = st.text_input(f"Detailed description of {input_field}", key=input_field_key, value=existing_input_fields.get(input_field, ''))
 
                     # Set the value for the input field in each email where it appears
                     for i, email in enumerate(st.session_state.emails):
@@ -205,11 +213,12 @@ def campaign_page():
             for i, email in enumerate(st.session_state.emails):
                 with st.container():
                     st.write(f"Settings for Email {i+1}")
-                    use_AI_key = f"use_AI_{i}"
+                    use_AI_key = f"use_AI_{i}"+str(i+1)
                     default_value = int(st.session_state.emails[i].get('use_AI', False))
+                    default_index = 0 if default_value == 1 else 1
                     user_choice = st.radio(f"Use hyper-personalization with AI for Email {i+1}", 
                                ("Yes", "No"), 
-                               index=default_value, 
+                               index=default_index,
                                key=use_AI_key)
                     st.session_state.emails[i]['use_AI'] = (user_choice == "Yes")
             email_schemas = []
@@ -223,15 +232,17 @@ def campaign_page():
                 email_schemas.append(email_schema)
 
             # Button to save the campaign
-            if st.button("Save Campaign"):
+            st.text("IMPORTANT BEFORE YOU SAVE: What do we need to know about each lead to write a good campaign for them?")
+            data_request = st.text_input("Enter that information here: ", value=None)
+            if data_request and st.button("Save Campaign"):
                 campaign_schema = {
                     "name": chosen_campaign_name,
                     "client_id": client['_id'],
-                    "recipient_count": recipient_count,
                     "status": {},  # Add logic to set the campaign status
-                    "emails": email_schemas
+                    "emails": email_schemas,
+                    "data_request": data_request
                 }
-                Campaigns.update_campaign_by_id(campaign_id, campaign_schema)
+                Campaigns.update_campaign_by_id(st.session_state['campaign_id'], campaign_schema)
                 st.success("Campaign saved to database.")
 
     except Exception as e:
@@ -263,21 +274,22 @@ def email_generation_page():
 
     # Get leads for campaign
     leads = Leads.get_leads_by_client_id(chosen_client['_id'])
-    groups = list(set([lead.get('group', '') for lead in leads]))
-    group = st.selectbox("select group names", groups) 
-    if st.button("Get by group"):
-        leads = [lead for lead in leads if lead.get('group', '') == group]
+    st.session_state.leads = leads
+    if st.button("Select Groups"):
+        groups = list(set([lead.get('group', '') for lead in leads]))
+        selected_groups = st.checkbox("Select Group", groups)
+        leads = [lead for lead in leads if lead.get('group', '') in selected_groups]
         st.session_state.leads = leads
     if st.button("Generate Emails"):
         progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Initializing email crafting process...")
         batch_id = bson.ObjectId()
-        for lead in leads:
+        for lead in st.session_state.leads:
             lead['batch_id'] = batch_id
-        createEmailsForLeadsByTemplate(chosen_client, st.session_state.leads,chosen_campaign,progress_bar, status_text)
+        createEmailsForLeadsByTemplate(chosen_client, st.session_state.leads[:3],chosen_campaign,progress_bar, status_text)
         status_text.text("Emails Created!")
-        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+" " + group+".csv"
+        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
         final_leads = Leads.get_leads_by_batch_id(batch_id)
         final_leads = [leadForCSV(lead) for lead in final_leads]
         final_leads = pd.DataFrame(final_leads)

@@ -44,3 +44,43 @@ def writeEmailFieldsFromCampaignAndLeadInfoFromFormat(email_templates, client_co
                             "client_context": client_context,
                             "lead_name": lead['first_name'],
                             "lead_company": lead['company']})
+
+
+def validateEmailsForLead(lead, campaign, client_context)->dict:
+    output_structure = {
+        "result": "bool",
+        "reason": "reason for the result, only include if the result is False"
+    }
+    prompt_template = """
+    EMAILS:
+    '''
+    {emails}
+    '''
+    Lead Info:
+    ''
+    {lead_info}
+    ''
+    Client Context:
+    '
+    {client_context}
+    '
+    You are verifying that the sequence of emails to send to {lead_name} from {lead_company} is valid and a good email. Here are the rules you have to follow.
+    The emails should fit all of the following criteria:
+        a. The email must be coherent and sound human.
+        b. The email must be personalized to the lead.
+        c. The email should not make any assumptions and rely only on the lead information and the client context.
+        d. The email should be under 150 words.
+        e. There should be no random capitalization.
+        f. The email must make complete sense and not be at all confusing.
+    Output structure: {output_structure}
+    Your output should be just the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
+    OUTPUT:
+    """
+    return invoke_chain(model="gpt-3.5", temperature=0.2,
+                        prompt_template=prompt_template, output_parser="json",
+                        data = {"emails": campaign,
+                            "lead_info": lead,
+                            "client_context": client_context,
+                            "lead_name": lead['first_name'],
+                            "lead_company": lead['company'],
+                            "output_structure": output_structure})

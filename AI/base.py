@@ -3,14 +3,15 @@ from langchain_anthropic import ChatAnthropic
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from langchain_core.output_parsers import StrOutputParser
+from langchain.output_parsers.boolean import BooleanOutputParser
 import dotenv
 import os
 dotenv.load_dotenv()
-openai_api_key=os.getenv("OPENAI_API_KEY")
-claude_api_key=os.getenv("ANTHROPIC_API_KEY")
+openai_api_key=os.environ["OPENAI_API_KEY"]
+claude_api_key=os.environ["ANTHROPIC_API_KEY"]
 
 
-def invoke_chain(model, temperature, prompt_template, output_parser, data):
+def invoke_chain(model, temperature, prompt_template, output_parser, data, retry=3):
     prompt = ChatPromptTemplate.from_template(prompt_template)
 
     if model == "gpt-3.5":
@@ -26,6 +27,12 @@ def invoke_chain(model, temperature, prompt_template, output_parser, data):
         output_parser = SimpleJsonOutputParser()
     elif output_parser == "str":
         output_parser = StrOutputParser()
+    elif output_parser == "bool":
+        output_parser = BooleanOutputParser()
 
     chain = prompt | model | output_parser
-    return chain.invoke(data)
+    while retry > 0:
+        try:
+            return chain.invoke(data)
+        except:
+            retry -= 1
