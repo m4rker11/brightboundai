@@ -1,6 +1,6 @@
 from services_and_db.leads.LeadObjectConverter import *
 import AI.emailWriter as emailWriter
-from AI.summarize import summarizePersonalizationData
+from AI.summarize import summarizePersonalizationData, inferFinancialGoals
 import services_and_db.leads.leadService as Leads
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -43,16 +43,25 @@ def singleBatchEmailCreationRun(batch, executor, template, client):
                 with error_lock:
                     errored_entries.append(enriched_row)
                     error_counter['count'] += 1
-                    if error_counter['count'] > 10:
+                    if error_counter['count'] >= 3:
+                        print("TOO MANY ERRORS ENCOUNTERED. STOPPING PROCESS")
                         return "Stopping due to too many errors"
             Leads.updateLead(enriched_row)
 
 def writeEmailSequenceFromTemplate(lead, template, client):
-    personalization_data = {"website": lead.get('website_summary', "Not available"),
+    personalization_data = {"first_name": lead.get('first_name', "Not available"),
+                            "website": lead.get('website_summary', "Not available"),
                             "linkedin": lead.get('linkedin_summary', "Not available"),
                             "job_title": lead.get('job_title', "Not available")}
     
+    print(personalization_data)
     personalization_data = summarizePersonalizationData(personalization_data, template)
+    if client["company_name"] == "Nth Degree CPAs":
+        # print("Nth Degree CPAs detected")
+        financial_goals = inferFinancialGoals(personalization_data)
+        personalization_data+="\n"+financial_goals
+    # print("Personalization data for "+lead['first_name']+ " " + str(lead['_id']) + ":")
+    # print(personalization_data)
     client_context = client['company_summary']
     emails = template['emails']
     for i in range(len(emails)):
@@ -72,15 +81,18 @@ def writeEmailSequenceFromTemplate(lead, template, client):
                 tries += 1
         if tries == 3:
             lead['error'] = True
+            lead['error_message'] = "Failed to extract fields from campaign context"
             return lead
         lead = extractFields(campaign_context, lead, field_keys)
     fields = lead['email_fields']
+    print("Fields for "+lead['first_name']+ " " + str(lead['_id']) + ":")
     print(fields)
     for key in fields.keys():
         if fields[key] == "" or fields[key] == None:
-            lead["error"] = [{"field": key, "valid": False, "message": "Field is empty"}]
+            lead['error'] = True
+            lead['error_message'] = "Field is empty: "+key
     if not lead.get("error", False):
-        lead = confirm_email_structure(lead, template, client_context, personalization_data)
+        lead = confirm_email_structure(lead, template, personalization_data)
     
     if lead.get("error", False):
         print("#######################################FAULTY EMAIL#######################################")
@@ -89,28 +101,29 @@ def writeEmailSequenceFromTemplate(lead, template, client):
 
     return lead
 
-def confirm_email_structure(lead, template, client_context, pd):
+def confirm_email_structure(lead, template, pd):
     retry = 0
     while retry<4:
         try:
             if retry ==3:
                 validation_result['result'] = False
             else:
-                validation_result = emailValidation(lead, template, client_context, pd)
+                validation_result = emailValidation(lead, template, pd)
             if validation_result['result'] or validation_result['result'] == "True":
                 return lead
             else:
                 lead['error'] = True
                 lead['to_be_fixed'] = True
-                lead['error_message'] = validation_result['reason']
+                lead['error_message'] = validation_result
                 return lead
         except:
             retry += 1
     
-def emailValidation(lead, campaign,client_context, pd):
+def emailValidation(lead, campaign, pd):
     personalized_emails = populateCampaignForLead(lead, campaign)
-    return emailWriter.validateEmailsForLead(leadForEmailWriter(lead, pd), personalized_emails, client_context)
-
+    result = emailWriter.validateEmailsForLead(leadForEmailWriter(lead, pd), personalized_emails)
+    print("Validation result for "+lead['first_name']+ " " + str(lead['_id']) + ":" + str(result))
+    return result
 def populateCampaignForLead(lead, campaign):
     fields = lead['email_fields']
     emails = campaign['emails']
@@ -126,6 +139,7 @@ def populateCampaignForLead(lead, campaign):
         email = email.replace("{", "")
         email = email.replace("}", "")
         personalized_email_bodies.append(email)
+    print(personalized_email_bodies)
     return personalized_email_bodies
 
 def extractFields(campaign_context, lead, field_keys):

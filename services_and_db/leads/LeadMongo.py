@@ -36,9 +36,9 @@ lead_schema = {
     'company_state': str,
     'company_linkedin_url': str,
     'employees': int,
-    'website_summary': str,
+    'website_summary': dict,
     'website_content': dict,
-    'linkedin_summary': str,
+    'linkedin_summary': dict,
     'lead_valid': bool,
     'lead_status': str,
     'email_fields': dict,
@@ -76,7 +76,7 @@ def validate_lead(lead):
         if field not in lead or lead[field] is None:
             print(f"Lead {lead['full_name']} is missing required field {field}")
             return False
-
+    
     return True  # If all checks pass, the lead is valid
 
 
@@ -116,6 +116,9 @@ def get_leads_for_website_or_linkedin_enrichment() -> list:
 
 def get_leads_by_client_id(client_id):
     return list(collection.find({"client_id": ObjectId(client_id), "campaign_id": {"$eq":None}, "ignore": {"$ne": True}}))
+
+def get_unenriched_leads_by_client_id(client_id): #website or linkedin summary not present
+    return list(collection.find({"client_id": ObjectId(client_id), "website_summary": {"$exists": False}, "linkedin_summary": {"$exists": False}, "ignore": {"$ne": True}}))
 
 def get_fully_enriched_leads_by_client_id(client_id):
     return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}, "linkedin_summary": {"$exists": True}, "website_summary": {"$exists": True}}))

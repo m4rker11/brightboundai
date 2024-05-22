@@ -3,16 +3,14 @@ from botasaurus.create_stealth_driver import create_stealth_driver
 from AI.summarize import extractInterestingNestedLinks, verify_website
 from urllib.parse import urlparse, urljoin
 import re
-def scrape_website(url, industry, company_name):
-    @browser(cache=False, max_retry=5, window_size=bt.WindowSize.REAL,
-             create_driver=create_stealth_driver(start_url="google.com",raise_exception=True),
-             parallel=20, reuse_driver=True, data=[url], close_on_crash=True, headless=True)
+def scrape_website(url, company_name):
+    @browser(cache=False, parallel=bt.calc_max_parallel_browsers, reuse_driver=True, data=[url], close_on_crash=True, max_retry=3, headless=True)
     def scrape_website_task(driver: AntiDetectDriver, data):
         url = validate_url(data)
         returnObj = {}
         driver.google_get(url)
         innerHtml = driver.bs4()
-        if not verify_website_correct(innerHtml, company_name, industry):
+        if not verify_website_correct(innerHtml.text, company_name):
             return None
         returnObj["emails"] = find_emails(innerHtml)
         allLinks = extract_urls_from_html(innerHtml)
@@ -33,7 +31,7 @@ def scrape_website(url, industry, company_name):
                 link_base = parsed_link.netloc
                 
                 # Check if the link belongs to the same domain
-                if link_base == base:
+                if link_base == base and not parsed_link.fragment:
                     internal_urls.append(link)
         internal_urls = filter_urls(internal_urls)
 
@@ -41,13 +39,18 @@ def scrape_website(url, industry, company_name):
         returnObj["home"] = whole
         interesting_urls = extractInterestingNestedLinks(internal_urls)
         returnObj["internal"] = {} 
+        # confirm that interesting_urls is not a hallucination
         for key, value in interesting_urls.items():
-            if value is not None and key != "cookie_policy" and key != "privacy_policy" and key != "terms_of_service":
-                driver.get(url=value)
-                if driver.is_bot_detected():
-                    return returnObj
-                returnObj["internal"][key] = extract_text_from_soup(driver.bs4())
-                returnObj['emails'] += find_emails(driver.bs4())
+            # if value is in internal_urls:
+            if value in internal_urls:
+                if value is not None and key != "cookie_policy" and key != "privacy_policy" and key != "terms_of_service":
+                    driver.get(url=value)
+                    if driver.is_bot_detected():
+                        print("Bot detected")
+                        return returnObj
+                    returnObj["internal"][key] = extract_text_from_soup(driver.bs4())
+                    returnObj['emails'] += find_emails(driver.bs4())
+        return returnObj
     try:
         return scrape_website_task(url)
     except:
@@ -86,8 +89,8 @@ def filter_urls(urls):
     filtered_urls = [url for url in urls if not any(filter in url for filter in filters)]
     return filtered_urls
 
-def verify_website_correct(bs4_content, company_name, industry):
-    return verify_website(company_name, industry, bs4_content)
+def verify_website_correct(bs4_content, company_name):
+    return verify_website(company_name, bs4_content)
 
 
 def find_emails(bs4_content):

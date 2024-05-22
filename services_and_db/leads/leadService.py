@@ -37,6 +37,9 @@ def get_leads_for_linkedin_enrichment():
 def get_leads_by_client_id(client_id):
     return Leads.get_leads_by_client_id(client_id)
 
+def get_unenriched_leads_by_client_id(client_id):
+    return Leads.get_unenriched_leads_by_client_id(client_id)
+
 def get_fully_enriched_leads_by_client_id(client_id):
     return Leads.get_fully_enriched_leads_by_client_id(client_id)
 

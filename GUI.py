@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import bson
 from services_and_db.leads.LeadObjectConverter import *
-from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads, verify_risky_leads_with_instantly
+from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads, enrichMongoDB
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
@@ -24,9 +24,33 @@ def main():
 
 def leads_page():
     st.title("Lead Management Tool")
-
     client_list = Clients.get_all_clients()
-    client_names = [client['name'] for client in client_list]
+    client_names = [client['company_name'] for client in client_list]
+    with st.form(key='enrichment_form'):
+        st.write("Enrich Leads for: ")
+        client_name = st.selectbox("Select a client to enrich leads for:", client_names+["All Clients"])
+        submit_button = st.form_submit_button(label='Submit')
+    if submit_button or 'client_name' in st.session_state:
+        if client_name != "All Clients":
+            client_id = Clients.get_client_by_name(client_name)['_id']
+            leads = Leads.get_unenriched_leads_by_client_id(client_id)
+            st.write("This action will enrich "+str(len(leads))+" leads.")
+            
+            st.session_state.client_name = client_name
+            if st.button("Enrich Leads"):
+                st.session_state.client_id = client_id
+                st.session_state.leads = leads
+                st.write(f"Enriching leads for {client_name}...")
+                print("Enriching leads for ", client_name)
+                enrichMongoDB(client_id)
+                st.write("Enrichment complete!")
+        else:
+            st.write("This action will enrich all leads.")
+            if st.button("Enrich Leads"):
+                st.write("Enriching all leads...")
+                enrichMongoDB()
+        
+    
     with st.form(key='my_form'):
         client_name = st.selectbox("Select a client to add leads to:", client_names)
         group = st.text_input("Enter Group Name")
@@ -34,7 +58,8 @@ def leads_page():
     if submit_button or 'client_name' in st.session_state:
         st.session_state.client_name = client_name
         st.session_state.group = group
-
+        client_id = Clients.get_client_by_name(client_name)['_id']
+        st.session_state.client_id = client_id
 
         choice = st.selectbox("Manual Upload or Direct From Wiza", ["Manual Upload", "Direct From Wiza"])
 
@@ -46,11 +71,10 @@ def leads_page():
                     data = pd.read_csv(uploaded_file)
                     data['client_id'] = client_id
                     data['group'] = group
-                    async_upload_leads(data=data, streamlit=st)
+                    async_upload_leads(data=data, client_name=client_name, group=group, client_id=client_id)
         elif choice == "Direct From Wiza":
             list_id = st.text_input("Enter Wiza List ID", value=None)
             if list_id and st.button("Get Leads from Wiza"):
-                client_id = Clients.get_client_by_name(client_name)['_id']
                 upload_leads(client_name=client_name, group=group, client_id=client_id)
 
 
@@ -273,28 +297,35 @@ def email_generation_page():
     st.session_state.campaign = chosen_campaign
 
     # Get leads for campaign
-    leads = Leads.get_leads_by_client_id(chosen_client['_id'])
-    st.session_state.leads = leads
-    if st.button("Select Groups"):
-        groups = list(set([lead.get('group', '') for lead in leads]))
-        selected_groups = st.checkbox("Select Group", groups)
-        leads = [lead for lead in leads if lead.get('group', '') in selected_groups]
+    leads = Leads.get_fully_enriched_leads_by_client_id(chosen_client['_id'])
+    print("Leads: ", len(leads))
+    with st.form(key='lead_form'):
+        max_leads = st.number_input("How many leads should be in the campaign?", min_value=0, max_value=len(leads), value=min(6, len(leads)))
+        submit_button = st.form_submit_button(label='Submit')
+    if submit_button or 'max_leads' in st.session_state:
+        st.session_state.max_leads = max_leads
+        leads = leads[:max_leads+1]
         st.session_state.leads = leads
-    if st.button("Generate Emails"):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        status_text.text("Initializing email crafting process...")
-        batch_id = bson.ObjectId()
-        for lead in st.session_state.leads:
-            lead['batch_id'] = batch_id
-        createEmailsForLeadsByTemplate(chosen_client, st.session_state.leads[:3],chosen_campaign,progress_bar, status_text)
-        status_text.text("Emails Created!")
-        lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
-        final_leads = Leads.get_leads_by_batch_id(batch_id)
-        final_leads = [leadForCSV(lead) for lead in final_leads]
-        final_leads = pd.DataFrame(final_leads)
-        st.dataframe(final_leads.head())
-        st.download_button("Download Emails!", data=final_leads.to_csv(), file_name=lead_file_name, mime='text/csv')
+        if st.button("Select Groups"):
+            groups = list(set([lead.get('group', '') for lead in leads]))
+            selected_groups = st.checkbox("Select Group", groups)
+            leads = [lead for lead in leads if lead.get('group', '') in selected_groups]
+            st.session_state.leads = leads
+        if st.button("Generate Emails"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            status_text.text("Initializing email crafting process...")
+            batch_id = bson.ObjectId()
+            for lead in st.session_state.leads:
+                lead['batch_id'] = batch_id
+            createEmailsForLeadsByTemplate(chosen_client, st.session_state.leads,chosen_campaign,progress_bar, status_text)
+            status_text.text("Emails Created!")
+            lead_file_name = "leads_for_campaign_"+chosen_campaign_name+"_for_"+chosen_client_name+".csv"
+            final_leads = Leads.get_leads_by_batch_id(batch_id)
+            final_leads = [leadForCSV(lead) for lead in final_leads]
+            final_leads = pd.DataFrame(final_leads)
+            st.dataframe(final_leads.head())
+            st.download_button("Download Emails!", data=final_leads.to_csv(), file_name=lead_file_name, mime='text/csv')
 
 if __name__ == "__main__":
     main()

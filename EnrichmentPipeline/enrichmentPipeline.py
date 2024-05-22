@@ -1,7 +1,7 @@
 from services_and_db.leads.LeadObjectConverter import *
 import pandas as pd
 import numpy as np
-from Providers.wiza.wiza_service import get_contacts_from_client_name_and_group_name
+from Providers.wiza.wiza_service import get_contacts_from_client_name_and_group_name, populate_existing_with_linkedin_data
 from EnrichmentPipeline.websiteEnrichment import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from AI.summarize import summarizeProfileData
@@ -38,16 +38,40 @@ def singleBatchEnrichmentRun(batch, executor, context):
     for future in as_completed(future_to_row):
         try:
             enriched_row = future.result(timeout=60)
-        except:
+        except Exception as e:
             print(future)
-            print("Timeout enriching a row")
-            enriched_row = None
+            
+            print("An error occurred in singleBatchEnrichmentRun:", str(e))
+            print("Timeout enriching a row") 
+            break
         if enriched_row is not None:
             print("Updating lead ", enriched_row['_id'])
             Leads.updateLead(enriched_row)
 
-def enrichMongoDB():
-    unenriched_leads = Leads.get_unenriched_leads()
+def enrichMongoDB(client_id = None):
+    if client_id is None:
+        unenriched_leads = Leads.get_unenriched_leads()
+    else:
+        unenriched_leads = Leads.get_unenriched_leads_by_client_id(client_id)
+    # no_linkedin_leads = [lead for lead in unenriched_leads if lead.get('linkedin_data', None) is None]
+    # if no_linkedin_leads:
+    #     print("Populating existing leads with linkedin data, we have ", len(no_linkedin_leads), " leads to enrich.")
+
+    #     # no_linkedin_leads = populate_existing_with_linkedin_data(no_linkedin_leads)
+    #     if no_linkedin_leads:
+    #         try:
+    #             print("Uploading leads to database")
+    #             # upload_leads(data=no_linkedin_leads)
+    #             # if client_id is not None:
+    #             #     unenriched_leads = Leads.get_unenriched_leads_by_client_id(client_id)
+    #             # else:
+    #             #     unenriched_leads = Leads.get_unenriched_leads()
+    #         except Exception as e:
+    #             print("An error occurred in enriching linkedin data:", str(e))
+    #             return
+    #     else:
+    #         print("OOPS! Something went wrong while enriching linkedin data.")
+    #         return
     batchEnrichList(unenriched_leads)
 
 
@@ -55,8 +79,10 @@ def enrichRow(row, context):
     try:
         if row.get('linkedin_data', None) is not None:
             row['linkedin_summary'] = summarizeProfileData(clean_empty(row['linkedin_data']))
-        row = enrichWebsite(row, context)
-    except:
+            row = enrichWebsite(row, context)
+
+    except Exception as e:
+        print("An error occurred in enrhichRow:", str(e))
         return stoopifyLead(row)
     return row
 
@@ -77,19 +103,20 @@ def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar,
         update_progress(progress_bar, start_index, end_index, total_leads, status_text)
 
 
-def async_upload_leads(data=None, client_name=None, group=None, client_id=None):
+def async_upload_leads(data, client_name, group, client_id):
     with ThreadPoolExecutor(max_workers=1) as executor:
         executor.submit(upload_leads, data, client_name, group, client_id)
 
 
 def upload_leads(data=None, client_name=None, group=None, client_id=None, list_id=None):
-    if data is None and client_name is not None and group is not None and client_id is not None:
+    if data is None and list_id is not None:
         data = get_contacts_from_client_name_and_group_name(list_id)
         data['client_id'] = client_id
         data['group'] = group
+        print("We have ", len(data), " from ", list_id)
     data = map_data_to_schema(data)
     Leads.addLeadsFromDataFrame(data)
-    verify_risky_leads_with_instantly()
+    # verify_risky_leads_with_instantly()
     enrichMongoDB()
 
 
@@ -136,7 +163,7 @@ def remove_unwanted_columns(data):
 
 def map_data_to_schema(data):
     # Mapping columns based on the provided details
-    data['linkedIn_url'] = data['linkedin'].apply(process_linkedin_url)
+    data['linkedIn_url'] = data.get('linkedin', None).apply(process_linkedin_url)
     data['funding_info'] = data.apply(create_funding_info, axis=1)
     data['company_info'] = data.apply(create_company_info, axis=1)
     data['website_url'] = data['company_domain']
@@ -157,6 +184,14 @@ def map_data_to_schema(data):
     return data
 
 def clean_empty(d):
+    #if it is a dataframe series, then clean empty each element
+    if isinstance(d, pd.Series):
+        return d.apply(clean_empty)
+    if isinstance(d, str):
+        try:
+            d = json.loads(d)
+        except:
+            return d
     if isinstance(d, dict):
         return {
             k: v 
