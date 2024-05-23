@@ -12,7 +12,7 @@ from EnrichmentPipeline.emailEnrichment import singleBatchEmailCreationRun
 import services_and_db.leads.leadService as Leads
 import services_and_db.clients.clientMongo as Clients
 
-def batchEnrichList(rows, batch_size=10):
+def batchEnrichList(rows, batch_size=3):
     total_rows = len(rows)
     # Process rows in batches
     clients = Clients.get_all_clients()
@@ -91,7 +91,7 @@ def stoopifyLead(row):
     row['ignore'] = True
     return row
 
-def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=10):
+def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=3):
     total_leads = len(leads)
     for start_index in range(0, total_leads, batch_size):
         end_index = min(start_index + batch_size, total_leads)

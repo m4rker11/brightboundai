@@ -11,7 +11,7 @@ error_counter = {'count': 0}
 error_lock = threading.Lock()
 errored_entries = []
 
-def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=10):
+def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=3):
     total_leads = len(leads)
     for start_index in range(0, total_leads, batch_size):
         end_index = min(start_index + batch_size, total_leads)
