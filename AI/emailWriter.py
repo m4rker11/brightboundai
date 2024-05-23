@@ -59,11 +59,10 @@ def validateEmailsForLead(lead, campaign)->dict:
     You are verifying that the sequence of emails to send to {lead_name} from {lead_company} is valid and a good email. Here are the rules you have to follow.
     The emails should fit all of the following criteria:
         a. The email must be coherent and sound human.
-        b. The email must be personalized to the lead.
-        c. The email should not make any assumptions and rely only on the lead information and the client context.
-        d. The email should be under 150 words.
+        b. The email must be somewhat personalized to the lead.
+        c. The email must make complete sense and not be at all confusing.
+        d. Every sentence should make perfect sense and not ramble on incomprehensibly.
         e. There should be no random capitalization.
-        f. The email must make complete sense and not be at all confusing.
     Output structure: {output_structure}
     Your output should be just the json object as the response starting and ending with curly brackets. Your output will be treated as a valid json object.
     OUTPUT:

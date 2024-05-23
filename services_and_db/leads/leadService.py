@@ -26,6 +26,7 @@ def addLeadsFromDataFrame(df)->bool:
     return True
 
 def updateLead(lead)->bool:
+    print("Updating lead ", lead['_id'])
     return Leads.update_lead(lead['_id'], lead)
 
 def get_unenriched_leads():

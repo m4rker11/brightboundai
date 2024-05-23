@@ -304,7 +304,7 @@ def email_generation_page():
         submit_button = st.form_submit_button(label='Submit')
     if submit_button or 'max_leads' in st.session_state:
         st.session_state.max_leads = max_leads
-        leads = leads[:max_leads+1]
+        leads = leads[:max_leads]
         st.session_state.leads = leads
         if st.button("Select Groups"):
             groups = list(set([lead.get('group', '') for lead in leads]))

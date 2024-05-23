@@ -39,13 +39,6 @@ def singleBatchEmailCreationRun(batch, executor, template, client):
     for future in as_completed(future_to_row):
         enriched_row = future.result()
         if enriched_row is not None:
-            if 'error' in enriched_row:  # Assuming error identification is done here
-                with error_lock:
-                    errored_entries.append(enriched_row)
-                    error_counter['count'] += 1
-                    if error_counter['count'] >= 3:
-                        print("TOO MANY ERRORS ENCOUNTERED. STOPPING PROCESS")
-                        return "Stopping due to too many errors"
             Leads.updateLead(enriched_row)
 
 def writeEmailSequenceFromTemplate(lead, template, client):
@@ -122,7 +115,7 @@ def confirm_email_structure(lead, template, pd):
 def emailValidation(lead, campaign, pd):
     personalized_emails = populateCampaignForLead(lead, campaign)
     result = emailWriter.validateEmailsForLead(leadForEmailWriter(lead, pd), personalized_emails)
-    print("Validation result for "+lead['first_name']+ " " + str(lead['_id']) + ":" + str(result))
+    # print("Validation result for "+lead['first_name']+ " " + str(lead['_id']) + ":" + str(result))
     return result
 def populateCampaignForLead(lead, campaign):
     fields = lead['email_fields']
