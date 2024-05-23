@@ -1,26 +1,49 @@
 import streamlit as st
 import pandas as pd
 import bson
+import streamlit_authenticator as stauth
 from services_and_db.leads.LeadObjectConverter import *
-from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate,  async_upload_leads, upload_leads, enrichMongoDB
+from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate, async_upload_leads, upload_leads, enrichMongoDB
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
-# Define the functions enrichRow and enrichCSV (already provided)
+import yaml
+from yaml.loader import SafeLoader
+
+with open('credentials.yaml') as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['pre-authorized']
+)
 
 # Streamlit UI
 def main():
-    # Page selection
-    page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management"])
+    authenticator.login()
+    if st.session_state["authentication_status"]:
+        # authenticator.logout()
+        # st.write(f'Welcome *{st.session_state["name"]}*')
+        # st.title('Some content')
+        page = st.sidebar.selectbox("Choose your task", ["Leads", "Generate Emails", "Client Management", "Campaign Management"])
 
-    if page == "Leads":
-        leads_page()
-    elif page == "Generate Emails": 
-        email_generation_page()
-    elif page == "Client Management":
-        client_management_page()
-    elif page == "Campaign Management":
-        campaign_page()
+        if page == "Leads":
+            leads_page()
+        elif page == "Generate Emails": 
+            email_generation_page()
+        elif page == "Client Management":
+            client_management_page()
+        elif page == "Campaign Management":
+            campaign_page()
+    elif st.session_state["authentication_status"] is False:
+        st.error('Username/password is incorrect')
+    elif st.session_state["authentication_status"] is None:
+        st.warning('Please enter your username and password')
+        # Page selection
+        
 
 def leads_page():
     st.title("Lead Management Tool")
@@ -241,9 +264,9 @@ def campaign_page():
                     default_value = int(st.session_state.emails[i].get('use_AI', False))
                     default_index = 0 if default_value == 1 else 1
                     user_choice = st.radio(f"Use hyper-personalization with AI for Email {i+1}", 
-                               ("Yes", "No"), 
-                               index=default_index,
-                               key=use_AI_key)
+                            ("Yes", "No"), 
+                            index=default_index,
+                            key=use_AI_key)
                     st.session_state.emails[i]['use_AI'] = (user_choice == "Yes")
             email_schemas = []
             for email in st.session_state.emails:
