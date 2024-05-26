@@ -124,7 +124,7 @@ def get_fully_enriched_leads_by_client_id(client_id):
     return list(collection.find({"client_id": ObjectId(client_id), "ignore": {"$ne": True}, "linkedin_summary": {"$exists": True}, "website_summary": {"$exists": True}}))
 
 def get_leads_by_batch_id(batch_id):
-    return list(collection.find({"batch_id": ObjectId(batch_id), "ignore": {"$ne": True}}))
+    return list(collection.find({"batch_id": ObjectId(batch_id), "ignore": {"$ne": True}, "error": {"$ne": True}}))
 
 def get_leads_by_campaign_id(campaign_id):
     return list(collection.find({"campaign_id": ObjectId(campaign_id), "ignore": {"$ne": True}, "to_be_fixed": {"$ne": True}}))

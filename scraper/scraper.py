@@ -1,5 +1,4 @@
 from botasaurus import *
-from botasaurus.create_stealth_driver import create_stealth_driver
 from AI.summarize import extractInterestingNestedLinks, verify_website
 from urllib.parse import urlparse, urljoin
 import re
