@@ -3,7 +3,7 @@ import requests
 import time
 class WizaAPI:
     def __init__(self):
-        self.api_key = os.environ['WIZA_API_KEY']
+        self.api_key = os.environ.get('WIZA_API_KEY')
         # if not self.api_key:
         #     raise ValueError("API key not found. Set the WIZA_API_KEY environment variable.")
 

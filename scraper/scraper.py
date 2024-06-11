@@ -3,7 +3,8 @@ from AI.summarize import extractInterestingNestedLinks, verify_website
 from urllib.parse import urlparse, urljoin
 import re
 def scrape_website(url, company_name):
-    @browser(cache=False, parallel=bt.calc_max_parallel_browsers, reuse_driver=True, data=[url], close_on_crash=True, max_retry=3, headless=True)
+    @browser(cache=False, parallel=bt.calc_max_parallel_browsers, reuse_driver=True, data=[url], 
+             close_on_crash=True, max_retry=3, headless=True, block_images=True)
     def scrape_website_task(driver: AntiDetectDriver, data):
         url = validate_url(data)
         returnObj = {}

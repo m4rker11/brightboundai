@@ -11,7 +11,7 @@ error_counter = {'count': 0}
 error_lock = threading.Lock()
 errored_entries = []
 
-def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=3):
+def createEmailsForLeadsByTemplate(client, leads, chosen_campaign, progress_bar, status_text, batch_size=10):
     total_leads = len(leads)
     for start_index in range(0, total_leads, batch_size):
         end_index = min(start_index + batch_size, total_leads)
@@ -35,19 +35,25 @@ def update_progress(progress_bar, start_index, end_index, total_leads, status_te
     progress_bar.progress(progress)
     status_text.text(f"Processed rows {start_index + 1} to {end_index} of {total_leads}")
 def singleBatchEmailCreationRun(batch, executor, template, client):
-    future_to_row = {executor.submit(writeEmailSequenceFromTemplate, row, template, client): row for row in batch}
+    future_to_row = {executor.submit(writeEmailSequenceFromTemplateWithRetry, row, template, client): row for row in batch}
     for future in as_completed(future_to_row):
         enriched_row = future.result()
         if enriched_row is not None:
             Leads.updateLead(enriched_row)
+def writeEmailSequenceFromTemplateWithRetry(lead, template, client):
+    return_lead = writeEmailSequenceFromTemplate(lead, template, client)
+    if return_lead.get("error", False):
+        return_lead = writeEmailSequenceFromTemplate(lead, template, client)
+    return return_lead
 
 def writeEmailSequenceFromTemplate(lead, template, client):
+    lead['error'] = False
     personalization_data = {"first_name": lead.get('first_name', "Not available"),
                             "website": lead.get('website_summary', "Not available"),
                             "linkedin": lead.get('linkedin_summary', "Not available"),
                             "job_title": lead.get('job_title', "Not available")}
     
-    print(personalization_data)
+    # print(personalization_data)
     personalization_data = summarizePersonalizationData(personalization_data, template)
     if client["company_name"] == "Nth Degree CPAs":
         # print("Nth Degree CPAs detected")
@@ -59,7 +65,6 @@ def writeEmailSequenceFromTemplate(lead, template, client):
     emails = template['emails']
     for i in range(len(emails)):
         emails[i]['number'] = i+1
-    emails = [email for email in emails if email['useAI']]
     lead['campaign_id'] = template['_id']
     field_keys = set()  # Initialize an empty set to store unique field keys
     campaign_context = {}
@@ -77,7 +82,7 @@ def writeEmailSequenceFromTemplate(lead, template, client):
             lead['error_message'] = "Failed to extract fields from campaign context"
             return lead
         lead = extractFields(campaign_context, lead, field_keys)
-    fields = lead['email_fields']
+    fields = lead.get('email_fields')
     print("Fields for "+lead['first_name']+ " " + str(lead['_id']) + ":")
     print(fields)
     for key in fields.keys():
@@ -86,12 +91,9 @@ def writeEmailSequenceFromTemplate(lead, template, client):
             lead['error_message'] = "Field is empty: "+key
     if not lead.get("error", False):
         lead = confirm_email_structure(lead, template, personalization_data)
-    
     if lead.get("error", False):
         print("#######################################FAULTY EMAIL#######################################")
         print(lead.get("email", lead['_id']), lead.get("error_message", "No error message"))
-    
-
     return lead
 
 def confirm_email_structure(lead, template, pd):

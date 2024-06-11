@@ -5,7 +5,7 @@ import os
 
 # Load environment variables
 load_dotenv()
-api_key = os.environ["INSTANTLY_API_KEY"]
+api_key = os.environ.get("INSTANTLY_API_KEY")
 
 def get_lead_info(email):
 

@@ -3,13 +3,16 @@ import pandas as pd
 import bson
 import streamlit_authenticator as stauth
 from services_and_db.leads.LeadObjectConverter import *
-from EnrichmentPipeline.enrichmentPipeline import createEmailsForLeadsByTemplate, async_upload_leads, upload_leads, enrichMongoDB
+from EnrichmentPipeline.enrichmentPipeline import *
 import services_and_db.clients.clientMongo as Clients
 import services_and_db.leads.leadService as Leads
 import services_and_db.campaigns.campaignMongo as Campaigns
 import yaml
 from yaml.loader import SafeLoader
+from dotenv import load_dotenv
+import os
 
+load_dotenv() 
 with open('credentials.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -281,7 +284,7 @@ def campaign_page():
             # Button to save the campaign
             st.text("IMPORTANT BEFORE YOU SAVE: What do we need to know about each lead to write a good campaign for them?")
             data_request = st.text_input("Enter that information here: ", value=None)
-            if data_request and st.button("Save Campaign"):
+            if data_request and st.button("Save Campaign") and st.session_state.get('campaign_id',None) is not None:
                 campaign_schema = {
                     "name": chosen_campaign_name,
                     "client_id": client['_id'],
@@ -289,7 +292,7 @@ def campaign_page():
                     "emails": email_schemas,
                     "data_request": data_request
                 }
-                Campaigns.update_campaign_by_id(st.session_state['campaign_id'], campaign_schema)
+                Campaigns.update_campaign_by_id(st.session_state.get('campaign_id'), campaign_schema)
                 st.success("Campaign saved to database.")
 
     except Exception as e:
@@ -329,11 +332,16 @@ def email_generation_page():
         st.session_state.max_leads = max_leads
         leads = leads[:max_leads]
         st.session_state.leads = leads
-        if st.button("Select Groups"):
+        if st.button("Select specific group"):
             groups = list(set([lead.get('group', '') for lead in leads]))
-            selected_groups = st.checkbox("Select Group", groups)
-            leads = [lead for lead in leads if lead.get('group', '') in selected_groups]
+            selected_group = st.selectbox("Select Group", groups)
+            st.session_state.selected_group=selected_group
+        if st.session_state.get('selected_group', False):
+            leads = [lead for lead in leads if lead.get('group', '') == st.session_state.selected_group]
             st.session_state.leads = leads
+            st.write("Selected Group: ", st.session_state.selected_group)
+            st.write("Number of leads in group: ", len(leads))
+            st.write("Selection complete!")
         if st.button("Generate Emails"):
             progress_bar = st.progress(0)
             status_text = st.empty()

@@ -1,0 +1,8 @@
+botasaurus==3.2.27
+langchain
+langchain_openai
+streamlit
+streamlit-authenticator
+python-dotenv
+bson
+pymongo

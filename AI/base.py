@@ -4,7 +4,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain.output_parsers.boolean import BooleanOutputParser
 import os
-openai_api_key=os.environ["OPENAI_API_KEY"]
+openai_api_key=os.environ.get("OPENAI_API_KEY")
 
 
 def invoke_chain(model, temperature, prompt_template, output_parser, data, retry=3):
